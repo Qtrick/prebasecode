@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "a9dd7de8faf91fc20a370f8b34e94ce6b6c69a4c",
-  "sourceFingerprint": "98820ad2be365bec9e948e2ab92661e2ab50b1d664e281314c40995f385b5d82",
-  "productFingerprint": "98820ad2be365bec9e948e2ab92661e2ab50b1d664e281314c40995f385b5d82",
-  "generatedAt": "2026-09-08T00:58:29.255Z",
+  "sourceHead": "6cc833f39493084bf88cb3d8f1b11b2534b95d5e",
+  "sourceFingerprint": "2acb1d289024f08750065a9ea4ac4f2d397702a5556217646044dc511bc08e23",
+  "productFingerprint": "2acb1d289024f08750065a9ea4ac4f2d397702a5556217646044dc511bc08e23",
+  "generatedAt": "2026-09-08T15:31:21.714Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -109,7 +109,7 @@
           "semanticContentSubtree": "compactContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 49353,
+          "windowNumber": 50456,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -306,7 +306,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9462,
+        "durationRealCyclesMs": 9573,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -387,7 +387,7 @@
           "semanticContentSubtree": "expandedContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 49353,
+          "windowNumber": 50456,
           "openButtonFrame": {
             "y": 77,
             "x": 265,
@@ -587,7 +587,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 357,
+        "durationRetargetMs": 373,
         "diagRetarget": {
           "renderedPendingMessage": "",
           "animationCount": 203,
@@ -654,7 +654,7 @@
           "semanticContentSubtree": "peekContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 49353,
+          "windowNumber": 50456,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -886,12 +886,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -60,
-        "heapUsedMb": 6.74,
-        "rssDiffKb": 38736,
-        "rssMb": 110.81,
-        "cpuDeltaUserMs": 1083119,
-        "cpuDeltaSystemMs": 202346
+        "heapDiffKb": -52,
+        "heapUsedMb": 6.69,
+        "rssDiffKb": 45760,
+        "rssMb": 118.63,
+        "cpuDeltaUserMs": 1235394,
+        "cpuDeltaSystemMs": 240560
       }
     },
     {
@@ -1168,9 +1168,9 @@
             "targetPresentationState": "interactive",
             "frame": {
               "x": 599,
-              "y": 915,
+              "y": 916,
               "width": 313,
-              "height": 67,
+              "height": 66,
               "isActual": true,
               "requested": {
                 "x": 599,
@@ -1702,9 +1702,9 @@
           "state": "interactive",
           "frame": {
             "x": 599,
-            "y": 945,
+            "y": 946,
             "width": 313,
-            "height": 37,
+            "height": 36,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1719,9 +1719,9 @@
           "pinned": true,
           "frame": {
             "x": 599,
-            "y": 895,
+            "y": 887,
             "width": 313,
-            "height": 87,
+            "height": 95,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1768,9 +1768,9 @@
           "state": "completedTransient",
           "frame": {
             "x": 599,
-            "y": 944,
+            "y": 946,
             "width": 313,
-            "height": 38,
+            "height": 36,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1889,7 +1889,7 @@
             "questionButtonCount": 0
           },
           "long-pending": {
-            "height": 115,
+            "height": 116,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -2126,7 +2126,7 @@
           "height": 114,
           "isActual": true,
           "requested": {
-            "x": 599,
+            "x": 599.5,
             "y": 868,
             "width": 313,
             "height": 114
@@ -2246,7 +2246,7 @@
           },
           "requestedFrame": {
             "y": 797,
-            "x": 585,
+            "x": 585.5,
             "width": 341,
             "height": 185
           }
@@ -2292,7 +2292,7 @@
           },
           "requestedFrame": {
             "y": 916,
-            "x": 599,
+            "x": 599.5,
             "width": 313,
             "height": 66
           },
@@ -2958,7 +2958,7 @@
             "width": 313,
             "height": 114
           },
-          "safeAreaTop": 32,
+          "safeAreaTop": 0,
           "screenTopY": 982,
           "topAnchorDelta": 0,
           "shoulderMetrics": {

@@ -198,32 +198,43 @@ if (!native.includes('emit:@"dismissAttention"')) {
 		failures.push('native must stage expanded content at target size before morph (no blank black expansion)');
 	}
 	if (!native.includes('computeExpandedWidth:') || !native.includes('kExpandedWidthPad')) {
-		failures.push('native must prefer natural notch width and only pad for option rows (kExpandedWidthPad)');
+		failures.push('native must implement computeExpandedWidth: and retain the kExpandedWidthPad alias for contract parity');
 	}
 	{
 		const widthFnStart = native.indexOf('- (CGFloat)computeExpandedWidth:(CGFloat)naturalW {');
-		const widthFn = widthFnStart >= 0 ? native.slice(widthFnStart, widthFnStart + 350) : '';
-		if (!/pendingOptions\.count > 2/.test(widthFn)
-			|| !/kExpandedWidthPad/.test(widthFn)
+		const widthFn = widthFnStart >= 0 ? native.slice(widthFnStart, widthFnStart + 800) : '';
+		// New bucket strategy: COMPACT / STANDARD / WIDE by semantic state class
+		if (!/InteractiveApproval/.test(widthFn)
+			|| !/InteractiveQuestion/.test(widthFn)
+			|| !/kExpandedWidthWidePad/.test(widthFn)
+			|| !/kExpandedWidthStandardPad/.test(widthFn)
 			|| !/return naturalW;/.test(widthFn)
 			|| /320/.test(widthFn)) {
-			failures.push('computeExpandedWidth must return naturalW unless question has >2 options; must not force 320pt');
+			failures.push('computeExpandedWidth must use COMPACT/STANDARD/WIDE buckets: approval+question always WIDE, working STANDARD, compact returns naturalW; must not force 320pt');
 		}
+		// Geometry constants: height max upgraded to 200, width legacy alias preserved
 		if (!/kExpandedHeightMin = 72/.test(native)
-			|| !/kExpandedHeightMax = 192/.test(native)
+			|| !/kExpandedHeightMax = 200/.test(native)
 			|| !/kExpandedWidthPad = 28/.test(native)
+			|| !/kExpandedWidthStandardPad = 36/.test(native)
+			|| !/kExpandedWidthWidePad = 84/.test(native)
+			|| !/kContentMinScrollHeight = 40/.test(native)
 			|| !/kStableCompactLeftWing = 64/.test(native)
 			|| !/kStableCompactRightWing = 64/.test(native)) {
-			failures.push('native geometry constants must stay at min=72 max=192 pad=28 stable wings=64');
+			failures.push('native geometry constants must be: min=72 max=200 widthPad=28(alias) standardPad=36 widePad=84 minScroll=40 wings=64');
 		}
 		if (!/LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 72/.test(magnusCommon)
-			|| !/LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 192/.test(magnusCommon)
+			|| !/LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 200/.test(magnusCommon)
 			|| !/LIVE_ACTIVITY_EXPANDED_WIDTH_PAD = 28/.test(magnusCommon)
 			|| !/LIVE_ACTIVITY_WING_WIDTH_DEFAULT = 64/.test(magnusCommon)) {
-			failures.push('TS magnusLiveActivity geometry constants must stay aligned with native (72/192/28/64)');
+			failures.push('TS magnusLiveActivity geometry constants must stay aligned with native (72/200/28/64)');
 		}
 		if (/MAX\(320/.test(native) || /kExpandedMinWidth\s*=\s*320/.test(native)) {
 			failures.push('native must not force a fixed 320pt expanded min width');
+		}
+		// Minimum scroll viewport: working interactive must guarantee kContentMinScrollHeight usable area
+		if (!native.includes('kContentMinScrollHeight') || !native.includes('Enforce minimum usable scroll viewport')) {
+			failures.push('native must enforce kContentMinScrollHeight minimum scroll viewport (removes the 114pt cap)');
 		}
 		{
 			const stackFnStart = native.indexOf('- (CGFloat)computeControlsStackHeight {');

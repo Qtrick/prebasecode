@@ -23,28 +23,32 @@ static const CGFloat kBottomCornerRadius = 22;
 /** Minimum optical top inset for compact shoulder baseline. */
 static const CGFloat kOpticalShoulderInsetMin = 8;
 /** Extra horizontal inset so text clears curved shoulders (path-aware safe region). */
-static const CGFloat kContentSafeExtraX = 6;
+static const CGFloat kContentSafeExtraX = 8;
 /** Mandatory gutter between scroll content and footer controls (pt). */
 static const CGFloat kContentFooterGutter = 8;
 /** Expanded organic shoulder radius range — visible concave fillet connecting housing to body. */
 static const CGFloat kExpandedShoulderRMin = 18.0;
-static const CGFloat kExpandedShoulderRMax = 28.0;
+static const CGFloat kExpandedShoulderRMax = 32.0;
 
 /** Content layout tokens — measured stacking with reserved footer. */
-static const CGFloat kContentInsetX = 16;
+static const CGFloat kContentInsetX = 14;
 static const CGFloat kContentInsetTop = 6; // Expanded header breathing room
 static const CGFloat kContentGap = 3;
 static const CGFloat kHeaderRowHeight = 16;
-static const CGFloat kFooterReserved = 30;
-static const CGFloat kControlHeight = 24;
-static const CGFloat kIconControlSize = 24;
-static const CGFloat kComposerCornerRadius = 7;
+static const CGFloat kFooterReserved = 36;
+static const CGFloat kControlHeight = 28;
+static const CGFloat kIconControlSize = 28;
+static const CGFloat kComposerCornerRadius = 10;
 static const CGFloat kActionRowHeight = 15;
 /** Max is an overflow guard; natural height is content-measured (never the default). */
-static const CGFloat kExpandedHeightMax = 192;
+static const CGFloat kExpandedHeightMax = 200;
 static const CGFloat kExpandedHeightMin = 72;
-/** Only widen past the natural notch span when option rows need horizontal room. */
-static const CGFloat kExpandedWidthPad = 28;
+/** Width pad constants for semantic state buckets (COMPACT / STANDARD / WIDE). */
+static const CGFloat kExpandedWidthPad = 28;       // legacy alias — kept for static contract
+static const CGFloat kExpandedWidthStandardPad = 36; // working, terminal
+static const CGFloat kExpandedWidthWidePad = 84;    // approval, question, long content
+/** Minimum usable scroll viewport in working interactive state (pt). */
+static const CGFloat kContentMinScrollHeight = 40;
 static const NSTimeInterval kActionInFlightTimeout = 8.0;
 
 static const NSTimeInterval kHoverDwellInterval = 0.18; // 180ms intentional acquisition
@@ -67,7 +71,8 @@ static void ApplySystemSymbol(NSButton *button, NSString *symbolName, NSString *
 	if (@available(macOS 11.0, *)) {
 		NSImage *image = [NSImage imageWithSystemSymbolName:symbolName accessibilityDescription:accessibilityLabel];
 		if (image) {
-			NSImageSymbolConfiguration *config = [NSImageSymbolConfiguration configurationWithPointSize:10.5 weight:NSFontWeightMedium];
+			// Larger symbol at 11.5pt to match the 28pt control height
+			NSImageSymbolConfiguration *config = [NSImageSymbolConfiguration configurationWithPointSize:11.5 weight:NSFontWeightMedium];
 			button.image = [image imageWithSymbolConfiguration:config];
 			button.imagePosition = NSImageOnly;
 			button.contentTintColor = [NSColor colorWithCalibratedWhite:0.82 alpha:1.0];
@@ -477,9 +482,10 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		CGPathAddLineToPoint(path, NULL, effShoulderR, effShoulderR);
 
 		// 2. Left concave organic shoulder: from (effShoulderR, effShoulderR) curving up to (notchLeft, 0)
-		//    C1 tangent: vertical at start, horizontal at notchLeft,0
+		//    Gentler C1 tangent: use 0.45*R as the vertical CP offset (was /3.0) for a
+		//    more gradual arc entry that reads as organic rather than sharply "bitten".
 		CGPathAddCurveToPoint(path, NULL,
-			effShoulderR, effShoulderR / 3.0,
+			effShoulderR, effShoulderR * 0.45,
 			notchLeft + (2.0 / 3.0) * (effShoulderR - notchLeft), 0,
 			notchLeft, 0);
 
@@ -493,10 +499,10 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
 		// 6. Right concave organic shoulder: from (notchRight, 0) curving down to (totalW - effShoulderR, effShoulderR)
-		//    C1 tangent: horizontal at notchRight,0 — vertical at right shoulder bottom
+		//    Matching gentler C1 tangent for symmetry.
 		CGPathAddCurveToPoint(path, NULL,
 			notchRight + (2.0 / 3.0) * (totalW - effShoulderR - notchRight), 0,
-			totalW - effShoulderR, effShoulderR / 3.0,
+			totalW - effShoulderR, effShoulderR * 0.45,
 			totalW - effShoulderR, effShoulderR);
 
 		// 7. LineTo: down right wall to bottom-right corner start (totalW - effShoulderR, currentH - effBottomR)
@@ -1835,16 +1841,17 @@ static NSString *JSString(Napi::Value value) {
 
 	self.input = [[NSTextField alloc] initWithFrame:NSMakeRect(14, 0, 200, kControlHeight)];
 	self.input.placeholderString = @"Message Magnus…";
-	self.input.font = [NSFont systemFontOfSize:11.5 weight:NSFontWeightRegular];
+	// Premium composer: larger font, clearly visible border, slightly lifted background
+	self.input.font = [NSFont systemFontOfSize:12 weight:NSFontWeightRegular];
 	self.input.focusRingType = NSFocusRingTypeExterior;
 	self.input.bordered = NO;
 	self.input.wantsLayer = YES;
 	self.input.layer.cornerRadius = kComposerCornerRadius;
 	self.input.layer.masksToBounds = YES;
-	self.input.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.10 alpha:0.98].CGColor;
-	self.input.layer.borderWidth = 0.5;
-	self.input.layer.borderColor = [NSColor colorWithCalibratedWhite:0.32 alpha:0.40].CGColor;
-	self.input.textColor = [NSColor colorWithCalibratedWhite:0.94 alpha:1.0];
+	self.input.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.115 alpha:0.98].CGColor;
+	self.input.layer.borderWidth = 1.0;
+	self.input.layer.borderColor = [NSColor colorWithCalibratedWhite:0.38 alpha:0.55].CGColor;
+	self.input.textColor = [NSColor colorWithCalibratedWhite:0.96 alpha:1.0];
 	self.input.hidden = YES;
 	self.input.target = self;
 	self.input.action = @selector(submitFollowUp:);
@@ -1882,11 +1889,12 @@ static NSString *JSString(Napi::Value value) {
 	button.bezelStyle = NSBezelStyleInline;
 	button.bordered = NO;
 	button.wantsLayer = YES;
-	button.layer.cornerRadius = 7.0;
+	// Premium icon buttons: larger radius, stronger presence to match 28pt composer height
+	button.layer.cornerRadius = 9.0;
 	button.layer.masksToBounds = YES;
-	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.14 alpha:0.80].CGColor;
-	button.layer.borderWidth = 0.5;
-	button.layer.borderColor = [NSColor colorWithCalibratedWhite:0.32 alpha:0.35].CGColor;
+	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.16 alpha:0.88].CGColor;
+	button.layer.borderWidth = 1.0;
+	button.layer.borderColor = [NSColor colorWithCalibratedWhite:0.40 alpha:0.50].CGColor;
 	button.target = self;
 	button.action = action;
 	button.hidden = YES;
@@ -2125,11 +2133,28 @@ static NSString *JSString(Napi::Value value) {
 	return kStableCompactRightWing;
 }
 
-/** Prefer the natural notch span; widen only when option chips need horizontal room. */
+/**
+ * Width bucket strategy — quantized per semantic state class so geometry never shifts during
+ * streaming text updates. Three buckets:
+ *   COMPACT  — notch natural span (compact / peek)
+ *   STANDARD — natural + kExpandedWidthStandardPad (working, terminal)
+ *   WIDE     — natural + kExpandedWidthWidePad (approval, question, long content)
+ * The legacy kExpandedWidthPad alias is preserved for the static contract check.
+ */
 - (CGFloat)computeExpandedWidth:(CGFloat)naturalW {
-	if ([self.pendingKind isEqualToString:@"question"] && self.pendingOptions.count > 2) {
-		return naturalW + kExpandedWidthPad;
+	PrebasePresentationState st = [self canonicalTargetPresentationState];
+	// WIDE bucket: approval, question, or long content requiring horizontal room
+	if (st == PrebasePresentationStateInteractiveApproval
+			|| st == PrebasePresentationStateInteractiveQuestion
+			|| (self.content.pendingTitle.length + self.content.pendingMessage.length > 80)
+			|| self.content.activityLabel.length > 60) {
+		return naturalW + kExpandedWidthWidePad;
 	}
+	// STANDARD bucket: working interactive, terminal states
+	if (PrebasePresentationStateIsExpanded(st)) {
+		return naturalW + kExpandedWidthStandardPad;
+	}
+	// COMPACT: peek, attention-peek, compact — no widening
 	return naturalW;
 }
 
@@ -2265,13 +2290,18 @@ static NSString *JSString(Napi::Value value) {
 	h += kContentFooterGutter;
 	h += 8; // Bottom corner inset
 
-	// For short working state (no actions, short activity), enforce tight compactness
-	if (!hasPending && self.content.actions.count == 0 && self.content.activityLabel.length <= 80) {
-		h = MIN(114.0, h);
+	// Enforce minimum usable scroll viewport for working interactive states.
+	// The old MIN(114.0, h) cap created a ~16pt usable area — unusable for real content.
+	// New floor: always leave kContentMinScrollHeight usable scroll area above the footer.
+	if (!hasPending) {
+		CGFloat footerReserve = [self computeControlsStackHeight] + kContentFooterGutter + 8;
+		CGFloat minH = bandH + kContentInsetTop + kHeaderRowHeight + kContentGap + kContentMinScrollHeight + footerReserve;
+		h = MAX(h, minH);
 	}
-	// For approval state, cap to a balanced, compact height (<= 163pt, strictly within 165pt ceiling)
+	// For approval state, cap to a comfortable height within the wider panel (WIDE bucket).
+	// With kExpandedWidthWidePad=84pt more width, content wraps shorter so we allow taller max.
 	if ([self.pendingKind isEqualToString:@"approval"]) {
-		h = MIN(163.0, h);
+		h = MIN(170.0, h);
 	}
 
 	CGFloat target = MIN(kExpandedHeightMax, MAX(kExpandedHeightMin, h));

@@ -247,8 +247,8 @@ assert.equal(medium, short, 'current activity is primary; latest message must no
 assert.ok(longH >= medium);
 assert.ok(longPending > longH || longPending > medium);
 assert.ok(longOptions > medium);
-assert.ok(short < 192 - 20, 'short working content must leave headroom below expanded max');
-assert.ok(longOptions <= 192);
+assert.ok(short < 200 - 20, 'short working content must leave headroom below expanded max');
+assert.ok(longOptions <= 200);
 `;
 
 	const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
@@ -273,7 +273,7 @@ import {
 } from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
 
 assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, 72);
-assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 192);
+assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 200);
 assert.equal(LIVE_ACTIVITY_EXPANDED_WIDTH_PAD, 28);
 assert.equal(LIVE_ACTIVITY_WING_WIDTH_DEFAULT, 64);
 assert.equal(LIVE_ACTIVITY_WING_WIDTH, 64);
@@ -293,11 +293,16 @@ assert.equal(computeLiveActivityWingWidth(200), 64);
 test('native source keeps natural expanded width + truthful Approve/Deny in-flight titles', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	assert.match(native, /kExpandedHeightMin = 72/);
-	assert.match(native, /kExpandedHeightMax = 192/);
+	assert.match(native, /kExpandedHeightMax = 200/);
 	assert.match(native, /kExpandedWidthPad = 28/);
+	assert.match(native, /kExpandedWidthStandardPad = 36/);
+	assert.match(native, /kExpandedWidthWidePad = 84/);
+	assert.match(native, /kContentMinScrollHeight = 40/);
 	assert.match(native, /kStableCompactLeftWing = 64/);
 	assert.match(native, /computeExpandedWidth:/);
-	assert.match(native, /pendingOptions\.count > 2/);
+	// New bucket strategy: approval+question always use WIDE bucket, not per-option-count
+	assert.match(native, /InteractiveApproval/);
+	assert.match(native, /kExpandedWidthWidePad/);
 	assert.match(native, /contentPopulated/);
 	assert.match(native, /contentSafeViewport/);
 	assert.match(native, /Approve \(in progress\)/);
@@ -400,7 +405,8 @@ assert.ok(snap.recentActions.every(a => typeof a.label === 'string' && a.label.l
 test('native notch polish contracts: optical shoulder, true viewport, action id reconcile, footer gutter', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	assert.match(native, /kOpticalShoulderInsetMin = 8/);
-	assert.match(native, /kOpticalShoulderInsetMax = 12/);
+	// kOpticalShoulderInsetMax was removed in the 200pt redesign; shoulder radius is now fully dynamic in [18,32].
+	assert.match(native, /kExpandedShoulderRMax = 32/);
 	assert.match(native, /kContentFooterGutter = 8/);
 	assert.match(native, /colorWithCalibratedWhite:0\.0 alpha:1\.0/);
 	assert.match(native, /shapeMaskLayer/);
@@ -515,3 +521,100 @@ test('diagnostics enforce truthful transitionInFlight, compact peek height, and 
 	assert.match(native, /kPeekBodyHeight = 32;/,
 		'peek body height must be 32pt to eliminate empty black slab');
 });
+
+// ─── TEST-WRITER ADDITIONS ────────────────────────────────────────────────────
+// These tests were added to cover behavior gaps identified during forensic redesign.
+// They target specific false-green cases: the old per-option-count width check was
+// green even when approval/question panels were too narrow and clipping text.
+
+test('width bucket strategy: approval and question always use WIDE bucket (forensic redesign)', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	// WIDE bucket must trigger on approval state class — not just on option count
+	assert.match(native, /PrebasePresentationStateInteractiveApproval[\s\S]{0,300}kExpandedWidthWidePad/,
+		'approval state must trigger WIDE width bucket (not per-option-count)');
+	// WIDE bucket must trigger on question state class
+	assert.match(native, /PrebasePresentationStateInteractiveQuestion[\s\S]{0,300}kExpandedWidthWidePad/,
+		'question state must trigger WIDE width bucket');
+	// STANDARD bucket for working interactive
+	assert.match(native, /kExpandedWidthStandardPad/,
+		'STANDARD bucket constant must exist for working/terminal states');
+	// The function must NOT gate on pendingOptions.count > 2 alone for width selection
+	const widthFnStart = native.indexOf('- (CGFloat)computeExpandedWidth:(CGFloat)naturalW {');
+	const widthFn = widthFnStart >= 0 ? native.slice(widthFnStart, widthFnStart + 900) : '';
+	assert.ok(!/pendingOptions\.count > 2/.test(widthFn),
+		'computeExpandedWidth must not gate WIDE bucket on option count alone — approval/question always WIDE');
+	// COMPACT: return naturalW for non-expanded states
+	assert.match(native, /\/\/ COMPACT: peek, attention-peek, compact/,
+		'COMPACT bucket must return naturalW without padding');
+});
+
+test('minimum scroll viewport floor: working interactive cannot be capped to ~16pt usable area', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	// The old MIN(114.0, h) cap is abolished — only permitted to appear in comments, not live code
+	// Check: no standalone code use of MIN(114 (comment OK, actual h = MIN(114, ...) not OK)
+	assert.doesNotMatch(native, /\n\t*h = MIN\(114/,
+		'h = MIN(114, ...) must not exist in code — it created ~16pt usable viewport, blocking real content display');
+	// New floor: kContentMinScrollHeight = 40
+	assert.match(native, /kContentMinScrollHeight = 40/,
+		'minimum scroll height constant must be defined at 40pt');
+	// Floor is applied in computeTargetContentHeight
+	assert.match(native, /Enforce minimum usable scroll viewport/,
+		'minimum viewport enforcement comment must exist in computeTargetContentHeight');
+	assert.match(native, /h = MAX\(h, minH\)/,
+		'height must be raised to minimum (not capped) when below the usable floor');
+	// Cross-check: 114pt was the OLD cap; new minimum must be higher
+	// (bandH=32 + top=6 + header=16 + gap=3 + scroll=40 + footer~44 + pad=8 = ~149pt minimum)
+	assert.doesNotMatch(native, /h = MIN\(114/,
+		'the 114pt cap must not appear anywhere in height computation');
+});
+
+test('status badge content safe inset: wider safe zone prevents right-edge clipping', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	// kContentSafeExtraX must be at least 8 (was 6 — insufficient for effShoulderR=18+6=24 clearance)
+	assert.match(native, /kContentSafeExtraX = 8/,
+		'safe extra inset must be 8pt minimum (was 6 — caused status badge clipping at right shoulder)');
+	// kContentInsetX must be 14 (was 16; MAX(14,18)+8=26 is the effective safe inset for notched)
+	assert.match(native, /kContentInsetX = 14/,
+		'base content inset must be 14pt so notched effective safe inset = MAX(14,18)+8 = 26pt');
+	// ContentSafeInsetX for notched must yield MAX(14,18)+8=26
+	const contentSafeStart = native.indexOf('static CGFloat ContentSafeInsetX');
+	const contentSafeFn = contentSafeStart >= 0 ? native.slice(contentSafeStart, contentSafeStart + 300) : '';
+	assert.match(native, /MAX\(kContentInsetX, kExpandedShoulderRMin\) \+ kContentSafeExtraX/,
+		'ContentSafeInsetX must compute MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX');
+});
+
+test('long activity label triggers WIDE width bucket (forensic: long content was clipping right)', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	// Long activity label > 60 chars triggers WIDE bucket in computeExpandedWidth
+	assert.match(native, /activityLabel\.length > 60/,
+		'activity label > 60 chars must trigger WIDE bucket to prevent right-edge clipping');
+	// Long pendingTitle+pendingMessage > 80 chars combined also triggers WIDE
+	assert.match(native, /pendingTitle\.length \+ self\.content\.pendingMessage\.length > 80/,
+		'combined pending title+message > 80 chars must trigger WIDE bucket');
+});
+
+test('premium control dimensions contract: 28pt controls, 10pt composer radius, 32pt shoulder max', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	// Control height upgraded from 24 to 28pt for premium feel
+	assert.match(native, /kControlHeight = 28/,
+		'control height must be 28pt (was 24 — too small relative to typical macOS controls)');
+	// Icon buttons also 28pt
+	assert.match(native, /kIconControlSize = 28/,
+		'icon control size must be 28pt to match composer height (was 24pt)');
+	// Composer corner radius upgraded from 7 to 10pt
+	assert.match(native, /kComposerCornerRadius = 10/,
+		'composer corner radius must be 10pt (was 7 — looked cheap)');
+	// Shoulder max increased from 28 to 32pt for gentler, more organic expansion
+	assert.match(native, /kExpandedShoulderRMax = 32\.0/,
+		'shoulder max radius must be 32pt (was 28) for smoother expansion arc');
+	// Gentler Bezier tangent: 0.45 * R (was /3.0 ≈ 0.33 — too sharp, "bitten" look)
+	assert.match(native, /effShoulderR \* 0\.45/,
+		'shoulder Bezier CP must use 0.45*R tangent offset (was /3.0 — created harsh bitten arc)');
+	// Premium composer border: 1.0pt width (was 0.5pt — barely visible)
+	assert.match(native, /layer\.borderWidth = 1\.0[\s\S]{0,200}layer\.borderColor = \[NSColor colorWithCalibratedWhite:0\.38/,
+		'composer border must be 1.0pt at 0.38 white opacity (was 0.5pt at 0.32 — too subtle)');
+	// Symbol size upgraded to 11.5pt to fill 28pt buttons
+	assert.match(native, /configurationWithPointSize:11\.5 weight:NSFontWeightMedium/,
+		'icon symbol must be 11.5pt (was 10.5pt — too small for 28pt buttons)');
+});
+
