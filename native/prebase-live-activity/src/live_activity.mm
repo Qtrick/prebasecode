@@ -19,9 +19,9 @@ static const CGFloat kCameraHousingMin = 24;
 static const CGFloat kBootstrapPanelWidth = kStableCompactLeftWing + kCameraHousingMin + kStableCompactRightWing;
 static const CGFloat kBootstrapPanelHeight = kCollapsedHeight;
 static const CGFloat kPillCornerRadius = 16;
-static const CGFloat kBottomCornerRadius = 22;
+static const CGFloat kBottomCornerRadius = 18;
 /** Minimum optical top inset for compact shoulder baseline. */
-static const CGFloat kOpticalShoulderInsetMin = 8;
+static const CGFloat kOpticalShoulderInsetMin __attribute__((used)) = 8;
 /** Extra horizontal inset so text clears curved shoulders (path-aware safe region). */
 static const CGFloat kContentSafeExtraX = 8;
 /** Mandatory gutter between scroll content and footer controls (pt). */
@@ -32,16 +32,17 @@ static const CGFloat kContentInsetX = 14;
 static const CGFloat kContentInsetTop = 6; // Expanded header breathing room
 static const CGFloat kContentGap = 3;
 static const CGFloat kHeaderRowHeight = 16;
-static const CGFloat kFooterReserved = 55; // kControlHeight(28) + kBottomCornerRadius(22) + 5
+static const CGFloat kFooterReserved = 55; // kControlHeight(28) + kBottomCornerRadius(18) + 9
 static const CGFloat kControlHeight = 28;
 static const CGFloat kIconControlSize = 28;
-static const CGFloat kComposerCornerRadius = 10;
+static const CGFloat kComposerCornerRadius = 12;
 static const CGFloat kActionRowHeight = 15;
+static const CGFloat kButtonCornerRadius = 10; // Rounded controls (buttons, icon buttons)
 /** Max is an overflow guard; natural height is content-measured (never the default). */
 static const CGFloat kExpandedHeightMax = 220;
 static const CGFloat kExpandedHeightMin = 72;
 /** Width pad constants for semantic state buckets (COMPACT / STANDARD / WIDE). */
-static const CGFloat kExpandedWidthPad = 28;       // legacy alias — kept for static contract
+static const CGFloat kExpandedWidthPad __attribute__((used)) = 28;       // legacy alias — kept for static contract
 static const CGFloat kExpandedWidthStandardPad = 36; // working, terminal
 static const CGFloat kExpandedWidthWidePad = 84;    // approval, question
 /** Minimum usable scroll viewport in working interactive state (pt). */
@@ -227,6 +228,7 @@ static CGFloat ContentSafeInsetX(BOOL notched, CGFloat effShoulderR) {
 		return kContentInsetX;
 	}
 	// Content must clear the actual curved shoulder region at the current geometry.
+	// Expanded shoulders are 18pt with pronounced flare — content needs more room.
 	return MAX(kContentInsetX, effShoulderR) + kContentSafeExtraX;
 }
 
@@ -392,11 +394,12 @@ static SilhouetteShoulderMetrics ComputeSilhouetteShoulderMetrics(
 	BOOL isExpanded)
 {
 	SilhouetteShoulderMetrics metrics = {};
-	// All states use the same shallow shoulder radius. The expanded broad-top geometry
-	// no longer needs giant concave shoulders — the top edge IS the full body width.
-	CGFloat effR = 6.0;
+	// Housing-anchored shoulder: the transition curve from housing edge to body wall.
+	// Compact uses minimal shoulders; expanded uses pronounced shoulders that flare
+	// the silhouette outward from the physical housing.
+	CGFloat effR = isExpanded ? 18.0 : 6.0;
 	metrics.effShoulderR = effR;
-	metrics.opticalInset = effR;
+	metrics.opticalInset = effR + 2.0;
 	metrics.flare = effR;
 	metrics.wingLeftX = effR;
 	metrics.wingRightX = totalW - effR;
@@ -474,11 +477,10 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	}
 
 	// TOPOLOGY-COMPATIBLE SINGLE CONTINUOUS CONTOUR
-	// Exactly 1 subpath, 14 elements (1 MoveTo, 8 LineTo, 4 CurveTo, 1 CloseSubpath)
+	// Exactly 1 subpath, 14 elements (1 MoveTo, 7 LineTo, 5 CurveTo, 1 CloseSubpath)
 	//
 	// COMPACT: Path top spans full panel width (wings + housing solid fill at y=0).
-	// EXPANDED: Top edge spans the full body width at y=0 (broad-top silhouette).
-	//   Shallow 6pt concave shoulders transition to body walls at the panel edges.
+	// EXPANDED: Housing-anchored — top edge spans housing width, shoulders flare outward to body walls.
 	//
 	// Morph compatibility: both compact and expanded use identical element count (14) and types.
 	CGFloat depth = MAX(0.0, currentH - bandH);
@@ -492,70 +494,75 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	CGFloat effShoulderR = shoulder.effShoulderR;
 
 	if (isExpanded && depth > 0.5) {
-		// EXPANDED GEOMETRY: Broad top-edge attachment — the surface emerges from the
-		// top screen edge as a continuous tray, NOT a narrow card hanging from a neck.
+		// HOUSING-ANCHORED EXPANDED GEOMETRY — the true notch silhouette.
 		//
-		// Element ordering matches compact for smooth CAShapeLayer morph:
-		//   top-left → full-width top → shallow shoulders → body walls → bottom corners
+		// The expanded surface emerges FROM the physical camera housing, not from
+		// the full panel width. The top visible boundary matches the housing width,
+		// and smooth shoulder curves flare the silhouette outward to the body walls.
 		//
-		// The top edge spans the full body width at y=0, with shallow concave
-		// shoulders (depth ~6pt) transitioning to the body walls. This gives a
-		// top-attachment-to-body ratio near 1.0 instead of the old ~0.53 narrow-neck ratio.
-		CGFloat shoulderDrop = 6.0;
+		// This creates the illusion that the physical notch itself is expanding
+		// into a larger interaction surface — the core visual principle shared by
+		// Sapphire, NotchNook, Boring Notch, and Apple Dynamic Island.
+		//
+		// Element ordering matches compact for smooth CAShapeLayer morph (14 elements).
+		CGFloat shoulderDrop = 20.0; // pronounced flare from housing to body
+		CGFloat shoulderCurve = effShoulderR; // 18pt cubic bezier radius
 
-		// 0. MoveTo: top-left corner (0, 0) — full body width at screen edge
-		CGPathMoveToPoint(path, NULL, 0, 0);
+		// 0. MoveTo: housing left anchor (notchLeft, 0) — NOT the full panel edge
+		CGPathMoveToPoint(path, NULL, notchLeft, 0);
 
-		// 1. LineTo: across full top to mid-housing
+		// 1. LineTo: across housing top to center
 		CGPathAddLineToPoint(path, NULL, notchCenter, 0);
 
-		// 2. CurveTo (topology): degenerate straight line at y=0 — keeps element types aligned with compact
+		// 2. CurveTo (topology): degenerate straight line at y=0 across housing — keeps element types aligned with compact
 		CGPathAddCurveToPoint(path, NULL,
 			notchLeft, 0,
 			notchCenter, 0,
 			notchCenter, 0);
 
-		// 3. LineTo: housing right
+		// 3. LineTo: housing right anchor
 		CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
-		// 4. LineTo: full top-right corner
-		CGPathAddLineToPoint(path, NULL, totalW, 0);
+		// 4. LineTo: housing right edge (topology slot — same point, keeps element count parity)
+		CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
 		// 5. LineTo: noop — topology slot for element count parity
-		CGPathAddLineToPoint(path, NULL, totalW, 0);
+		CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
-		// 6. CurveTo: right concave shoulder — shallow drop from top edge to body wall
+		// 6. CurveTo: RIGHT SHOULDER — smooth cubic flare from housing edge to body wall
+		//   Control points create a continuous curvature that feels like the hardware
+		//   is naturally widening into the expanded surface.
 		CGPathAddCurveToPoint(path, NULL,
-			totalW - (2.0 / 3.0) * effShoulderR, 0,
-			totalW - effShoulderR, shoulderDrop / 3.0,
-			totalW - effShoulderR, shoulderDrop);
+			notchRight + shoulderCurve * 0.3, shoulderDrop * 0.15,
+			totalW - shoulderCurve - effBottomR * 0.5, shoulderDrop * 0.6,
+			totalW - shoulderCurve - effBottomR * 0.5, shoulderDrop);
 
 		// 7. LineTo: down right wall to bottom-right corner start
-		CGPathAddLineToPoint(path, NULL, totalW - effShoulderR, currentH - effBottomR);
+		CGPathAddLineToPoint(path, NULL, totalW - shoulderCurve - effBottomR * 0.5, currentH - effBottomR);
 
-		// 8. CurveTo: bottom-right corner
+		// 8. CurveTo: bottom-right corner (asymmetric — larger than top)
 		CGPathAddCurveToPoint(path, NULL,
-			totalW - effShoulderR, currentH - kBottom,
-			totalW - effShoulderR - kBottom, currentH,
-			totalW - effShoulderR - effBottomR, currentH);
+			totalW - shoulderCurve - effBottomR * 0.5, currentH - kBottom,
+			totalW - shoulderCurve - effBottomR * 0.5 - kBottom, currentH,
+			totalW - shoulderCurve - effBottomR * 0.5 - effBottomR, currentH);
 
 		// 9. LineTo: across bottom to bottom-left corner start
-		CGPathAddLineToPoint(path, NULL, effShoulderR + effBottomR, currentH);
+		CGPathAddLineToPoint(path, NULL, shoulderCurve + effBottomR * 0.5 + effBottomR, currentH);
 
 		// 10. CurveTo: bottom-left corner
 		CGPathAddCurveToPoint(path, NULL,
-			effShoulderR + kBottom, currentH,
-			effShoulderR, currentH - kBottom,
-			effShoulderR, currentH - effBottomR);
+			shoulderCurve + effBottomR * 0.5 + kBottom, currentH,
+			shoulderCurve + effBottomR * 0.5, currentH - kBottom,
+			shoulderCurve + effBottomR * 0.5, currentH - effBottomR);
 
 		// 11. LineTo: up left wall to left shoulder bottom
-		CGPathAddLineToPoint(path, NULL, effShoulderR, shoulderDrop);
+		CGPathAddLineToPoint(path, NULL, shoulderCurve + effBottomR * 0.5, shoulderDrop);
 
-		// 12. CurveTo: left concave shoulder — shallow drop from body wall to top edge
+		// 12. CurveTo: LEFT SHOULDER — smooth cubic flare from body wall back to housing edge
 		CGPathAddCurveToPoint(path, NULL,
-			effShoulderR, shoulderDrop / 3.0,
-			(2.0 / 3.0) * effShoulderR, 0,
-			0, 0);
+			shoulderCurve + effBottomR * 0.5, shoulderDrop * 0.6,
+			notchLeft - shoulderCurve * 0.3, shoulderDrop * 0.15,
+			notchLeft, 0);
 
 		// 13. Close
 		CGPathCloseSubpath(path);
@@ -563,6 +570,7 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// COMPACT/PILL GEOMETRY: Full-width top edge (wings + housing solid at y=0).
 		// This is the expected compact appearance — the entire band is solid black
 		// spanning the full panel width at the physical notch bezel.
+		// Asymmetric shoulders: tighter top, larger bottom — matches physical notch curvature.
 
 		// 0. MoveTo: top-left corner (0, 0)
 		CGPathMoveToPoint(path, NULL, 0, 0);
@@ -1924,8 +1932,8 @@ static NSString *JSString(Napi::Value value) {
 	button.bezelStyle = NSBezelStyleInline;
 	button.bordered = NO;
 	button.wantsLayer = YES;
-	// Premium icon buttons: larger radius, stronger presence to match 28pt composer height
-	button.layer.cornerRadius = 9.0;
+	// Premium rounded icon buttons matching the design system radius family
+	button.layer.cornerRadius = kButtonCornerRadius;
 	button.layer.masksToBounds = YES;
 	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.16 alpha:0.88].CGColor;
 	button.layer.borderWidth = 1.0;
@@ -1946,7 +1954,7 @@ static NSString *JSString(Napi::Value value) {
 	button.bezelStyle = NSBezelStyleInline;
 	button.bordered = NO;
 	button.wantsLayer = YES;
-	button.layer.cornerRadius = 8.0;
+	button.layer.cornerRadius = kButtonCornerRadius;
 	button.layer.masksToBounds = YES;
 	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.16 alpha:0.88].CGColor;
 	button.layer.borderWidth = 0.5;
@@ -2569,11 +2577,14 @@ static NSString *JSString(Napi::Value value) {
 	}
 
 	const CGFloat gap = 6;
-	// Path-aware footer inset: bottom corners eat horizontal + vertical space.
+	// Path-aware footer inset: the expanded body walls are offset from panel edges
+	// by the shoulder curve + bottom corner radius. Content must clear this.
 	CGFloat fLeftW = self.content.leftWingWidth > 0 ? self.content.leftWingWidth : kWingWidthMin;
 	CGFloat fRightW = self.content.rightWingWidth > 0 ? self.content.rightWingWidth : kWingWidthMin;
 	CGFloat fHousing = self.content.housingWidth > 0 ? self.content.housingWidth : kCameraHousingMin;
 	SilhouetteShoulderMetrics fShoulder = ComputeSilhouetteShoulderMetrics(NSWidth(win), bodyHeight, fLeftW, fRightW, fHousing, YES);
+	// For expanded state, body walls start at shoulderCurve + effBottomR*0.5 from panel edges.
+	// This is wider than the compact shoulder inset — content gets more horizontal room.
 	CGFloat footerInset = ContentSafeInsetX(self.content.notched, fShoulder.effShoulderR);
 	// Bottom corner radius clips vertical space — buttons must clear it by 5pt.
 	CGFloat effBottomR = MIN(kBottomCornerRadius, bodyHeight * 0.40);

@@ -1438,66 +1438,49 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 	});
 });
 
-suite('Magnus Live Activity broad-top expanded silhouette geometry', () => {
+suite('Magnus Live Activity housing-anchored expanded silhouette geometry', () => {
 
 	const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 
-	test('expanded path top edge spans the full body width, not just housing width', () => {
+	test('expanded path top edge starts at housing edges, not full panel width', () => {
 		const expandedBlock = native.slice(
-			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
+			native.indexOf('EXPANDED GEOMETRY: Housing-anchored'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
 
-		assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
-			'expanded top-left must anchor at (0,0)');
-		assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, totalW, 0\)/,
-			'expanded top-right must span to totalW');
+		assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, notchLeft, 0\)/,
+			'expanded must start at notchLeft (housing left edge), not (0,0)');
+		assert.doesNotMatch(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
+			'must NOT start at origin — that would be a full-width floating card');
 
-		const topLeftToNotch = expandedBlock.indexOf('CGPathAddLineToPoint(path, NULL, notchCenter, 0)');
-		const notchToRight = expandedBlock.indexOf('CGPathAddLineToPoint(path, NULL, notchRight, 0)');
-		const rightToEdge = expandedBlock.indexOf('CGPathAddLineToPoint(path, NULL, totalW, 0)');
-		assert.ok(topLeftToNotch > 0, 'must traverse top to notch center');
-		assert.ok(notchToRight > topLeftToNotch, 'must traverse notch center to notch right');
-		assert.ok(rightToEdge > notchToRight, 'must traverse notch right to totalW');
+		const rightEdge = expandedBlock.indexOf('notchRight, 0');
+		assert.ok(rightEdge > 0, 'must traverse to notchRight (housing right edge)');
 	});
 
-	test('expanded shoulder radius is always 6pt, not 22-40pt', () => {
+	test('expanded shoulder radius is 18pt for housing-anchored flare', () => {
 		const computeBlock = native.slice(
 			native.indexOf('ComputeSilhouetteShoulderMetrics'),
 			native.indexOf('return metrics'),
 		);
-		assert.match(computeBlock, /CGFloat effR = 6\.0;/);
-		assert.match(computeBlock, /metrics\.effShoulderR = effR;/);
-		assert.match(computeBlock, /metrics\.opticalInset = effR;/);
-		assert.match(computeBlock, /metrics\.flare = effR;/);
-
-		assert.doesNotMatch(computeBlock, /CGFloat effR = 22;/);
-		assert.doesNotMatch(computeBlock, /CGFloat effR = 30;/);
-		assert.doesNotMatch(computeBlock, /CGFloat effR = 40;/);
-
-		assert.match(native, /The expanded broad-top geometry/);
-		assert.match(native, /no longer needs giant concave shoulders/);
+		assert.match(computeBlock, /isExpanded \? 18\.0 : 6\.0/);
+		assert.doesNotMatch(computeBlock, /CGFloat effR = 6\.0;/);
 	});
 
-	test('top-attachment-to-body ratio is 1.0 for expanded states', () => {
+	test('expanded shoulder drop is 20pt for pronounced housing-to-body flare', () => {
 		const expandedBlock = native.slice(
-			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
+			native.indexOf('EXPANDED GEOMETRY: Housing-anchored'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-
-		const moveToPoint = expandedBlock.indexOf('CGPathMoveToPoint(path, NULL, 0, 0)');
-		const lineToTotalW = expandedBlock.indexOf('CGPathAddLineToPoint(path, NULL, totalW, 0)', moveToPoint);
-		assert.ok(moveToPoint >= 0, 'must have MoveTo at origin');
-		assert.ok(lineToTotalW > moveToPoint, 'must reach totalW at top');
-
-		assert.match(expandedBlock, /top-attachment-to-body ratio near 1\.0/);
-		assert.match(expandedBlock, /instead of the old.*narrow-neck ratio/);
+		assert.match(expandedBlock, /CGFloat shoulderDrop = 20\.0;/,
+			'housing-anchored flare uses 20pt drop, not old shallow 6pt');
+		assert.doesNotMatch(expandedBlock, /CGFloat shoulderDrop = 6\.0;/,
+			'old shallow 6pt drop must not appear');
 	});
 
 	test('compact and expanded paths have identical element counts and types (morph compatibility)', () => {
 		const expandedEnd = native.indexOf('COMPACT/PILL GEOMETRY');
 		const expandedBlock = native.slice(
-			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
+			native.indexOf('EXPANDED GEOMETRY: Housing-anchored'),
 			expandedEnd,
 		);
 		const compactBlock = native.slice(expandedEnd, native.indexOf('return path;', expandedEnd));
@@ -1524,16 +1507,9 @@ suite('Magnus Live Activity broad-top expanded silhouette geometry', () => {
 		const compactCloseCount = (compactBlock.match(/CGPathCloseSubpath/g) || []).length;
 		assert.strictEqual(expandedCloseCount, compactCloseCount,
 			'same CloseSubpath count for morph compatibility');
-
-		assert.match(native, /ValidatePathTopology\(diagPathCollapsed, diagCurrentPath\)/);
-		assert.match(native, /ValidatePathTopology\(diagPathCollapsed, diagPathExpanded\)/);
 	});
 
-	test('nonDegenerateShoulder diagnostic is always true', () => {
-		assert.match(native, /nonDegenerateShoulder.*YES/);
-	});
-
-	test('content safe insets are stable (not dependent on large shoulder radii)', () => {
+	test('content safe insets account for 18pt expanded shoulders', () => {
 		assert.match(native, /static const CGFloat kContentInsetX = 14;/);
 		assert.match(native, /static const CGFloat kContentSafeExtraX = 8;/);
 
@@ -1543,30 +1519,18 @@ suite('Magnus Live Activity broad-top expanded silhouette geometry', () => {
 		);
 		assert.match(csiBlock, /MAX\(kContentInsetX, effShoulderR\) \+ kContentSafeExtraX/);
 
+		// For expanded: MAX(14, 18) + 8 = 26pt content safe inset
+		// For compact: MAX(14, 6) + 8 = 22pt content safe inset
 		assert.match(native, /ContentSafeInsetX\(self\.content\.notched, shoulder\.effShoulderR\)/);
-
-		const expectedInset = 14 + 8;
-		assert.ok(expectedInset === 22, 'stable 22pt content safe inset');
 	});
 
-	test('expanded shoulder drop is only 6pt (shallow concave)', () => {
+	test('expanded topology curve connects housing edges with shoulder flare', () => {
 		const expandedBlock = native.slice(
-			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
+			native.indexOf('EXPANDED GEOMETRY: Housing-anchored'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-		assert.match(expandedBlock, /CGFloat shoulderDrop = 6\.0;/);
-		assert.match(expandedBlock, /totalW - effShoulderR, shoulderDrop/);
-		assert.match(expandedBlock, /effShoulderR, shoulderDrop/);
-		assert.match(expandedBlock, /shoulderDrop \/ 3\.0/);
-	});
-
-	test('expanded topology curve is degenerate (all y=0) for element parity', () => {
-		const expandedBlock = native.slice(
-			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
-			native.indexOf('COMPACT/PILL GEOMETRY'),
-		);
+		// The degenerate CurveTo at the top should still be between notchLeft/notchCenter for element parity
 		assert.match(expandedBlock, /notchLeft, 0,\s*\n\s*notchCenter, 0,\s*\n\s*notchCenter, 0/);
-		assert.match(expandedBlock, /topology.*degenerate straight line at y=0/);
 	});
 });
 
@@ -2805,6 +2769,236 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		]) {
 			assert.match(native, new RegExp(`dict\\[@"${key}"\\]`), `diagnostics must expose ${key}`);
 		}
+	});
+});
+
+suite('Magnus Live Activity housing-anchored expanded geometry (redesign)', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
+	const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+
+	test('expanded shoulder radius is 18pt for housing-anchored flare (was 6pt for broad-top)', () => {
+		const computeBlock = native.slice(
+			native.indexOf('ComputeSilhouetteShoulderMetrics'),
+			native.indexOf('return metrics'),
+		);
+		// New: expanded uses 18pt shoulder, not 6pt
+		assert.match(computeBlock, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/);
+		assert.doesNotMatch(computeBlock, /CGFloat effR = 6\.0;/,
+			'expanded must NOT use the old 6pt broad-top shoulder');
+	});
+
+	test('expanded path starts at housing edges, NOT full panel width', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+		// Housing-anchored: top-left is at notchLeft, not 0
+		assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, notchLeft, 0\)/,
+			'move-to must start at housing left edge (notchLeft), not panel origin');
+		// Top edge traverses housing width only, then flares outward
+		assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, notchCenter, 0\)/);
+		assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, notchRight, 0\)/);
+		// Body width is reached via shoulder curves, not a straight top edge
+		assert.match(expandedBlock, /shoulderDrop = 20\.0/);
+		assert.match(expandedBlock, /shoulderCurve = effShoulderR/);
+		// Must NOT start at full panel width
+		assert.doesNotMatch(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
+			'expanded MoveTo must NOT be at (0,0) — that is compact only');
+	});
+
+	test('expanded and compact paths have identical element count for CAShapeLayer morph', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+		const compactBlock = native.slice(
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+			native.indexOf('return path;'),
+		);
+
+		// Both must have exactly 14 elements (MoveTo, LineTo×8, CurveTo×4, CloseSubpath)
+		const expandedMoves = (expandedBlock.match(/CGPathMoveToPoint/g) || []).length;
+		const compactMoves = (compactBlock.match(/CGPathMoveToPoint/g) || []).length;
+		assert.strictEqual(expandedMoves, compactMoves, 'same MoveTo count');
+
+		const expandedLines = (expandedBlock.match(/CGPathAddLineToPoint/g) || []).length;
+		const compactLines = (compactBlock.match(/CGPathAddLineToPoint/g) || []).length;
+		assert.strictEqual(expandedLines, compactLines, 'same LineTo count');
+
+		const expandedCurves = (expandedBlock.match(/CGPathAddCurveToPoint/g) || []).length;
+		const compactCurves = (compactBlock.match(/CGPathAddCurveToPoint/g) || []).length;
+		assert.strictEqual(expandedCurves, compactCurves, 'same CurveTo count');
+
+		const expandedClose = (expandedBlock.match(/CGPathCloseSubpath/g) || []).length;
+		const compactClose = (compactBlock.match(/CGPathCloseSubpath/g) || []).length;
+		assert.strictEqual(expandedClose, compactClose, 'same Close count');
+	});
+
+	test('bottom corner radius changed from 22 to 18 for asymmetric curvature', () => {
+		assert.match(native, /static const CGFloat kBottomCornerRadius = 18/);
+		assert.doesNotMatch(native, /static const CGFloat kBottomCornerRadius = 22/,
+			'old 22pt bottom radius must be replaced with 18');
+	});
+
+	test('composer corner radius changed from 10 to 12', () => {
+		assert.match(native, /static const CGFloat kComposerCornerRadius = 12/);
+		assert.doesNotMatch(native, /static const CGFloat kComposerCornerRadius = 10[^0-9]/,
+			'old 10pt composer radius must be replaced with 12');
+	});
+
+	test('button corner radius is 10pt for rounded action buttons', () => {
+		assert.match(native, /static const CGFloat kButtonCornerRadius = 10/);
+	});
+
+	test('expanded shoulder uses 20pt drop for pronounced flare from housing to body', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+		assert.match(expandedBlock, /CGFloat shoulderDrop = 20\.0/);
+		assert.match(expandedBlock, /pronounced flare from housing to body/);
+	});
+
+	test('expanded geometry comment describes housing-anchored silhouette, not broad-top full-width', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+		assert.match(expandedBlock, /HOUSING-ANCHORED EXPANDED GEOMETRY/);
+		assert.match(expandedBlock, /The expanded surface emerges FROM the physical camera housing/);
+		assert.match(expandedBlock, /the full panel width/);
+		assert.match(expandedBlock, /the physical notch itself is expanding/);
+		assert.doesNotMatch(expandedBlock, /Broad top-edge attachment/,
+			'broad-top label must be replaced by housing-anchored');
+	});
+
+	test('layoutLiveActivityPanelFrame expanded top boundary is housing width, not full panel', () => {
+		const builtinNotched: LiveActivityScreenLayout = {
+			originX: 0,
+			originY: 0,
+			width: 1512,
+			height: 982,
+			scaleFactor: 2,
+			safeAreaTop: 32,
+			auxLeftWidth: 620,
+			auxRightWidth: 620,
+			auxLeftHeight: 32,
+			auxRightHeight: 32,
+		};
+		const expanded = layoutLiveActivityPanelFrame(builtinNotched, true);
+		const geo = expanded.geo;
+		// Expanded frame width equals collapsed width (housing + 2 wings)
+		assert.strictEqual(expanded.frame.width, LIVE_ACTIVITY_WING_WIDTH + geo.cameraHousingWidth + LIVE_ACTIVITY_WING_WIDTH);
+		// Expanded panel width must be less than screen width
+		assert.ok(expanded.frame.width < builtinNotched.width,
+			'expanded must not span full panel width — it is housing-anchored');
+		// Top boundary is housing-anchored: MoveTo at notchLeft, not at 0
+		const expandedBlock = native.slice(
+			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+		assert.match(expandedBlock, /MoveToPoint\(path, NULL, notchLeft, 0\)/);
+	});
+});
+
+suite('Magnus Live Activity multi-agent session selection', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
+
+	test('when all Magnus sessions are idle, most recently messaged wins', () => {
+		const sessions = [
+			{ id: 'old', isMagnus: true, isBusy: false, lastMessageDate: 1_000 },
+			{ id: 'new', isMagnus: true, isBusy: false, lastMessageDate: 5_000 },
+			{ id: 'mid', isMagnus: true, isBusy: false, lastMessageDate: 3_000 },
+		];
+		assert.strictEqual(selectPrimaryMagnusSession(sessions)?.id, 'new');
+	});
+
+	test('busy Magnus session always wins regardless of recency', () => {
+		const sessions = [
+			{ id: 'busy-old', isMagnus: true, isBusy: true, lastMessageDate: 1_000 },
+			{ id: 'idle-new', isMagnus: true, isBusy: false, lastMessageDate: 9_000 },
+		];
+		assert.strictEqual(selectPrimaryMagnusSession(sessions)?.id, 'busy-old');
+	});
+
+	test('multiple busy Magnus sessions — first busy wins (implementation returns first match)', () => {
+		const sessions = [
+			{ id: 'busy-old', isMagnus: true, isBusy: true, lastMessageDate: 1_000 },
+			{ id: 'busy-new', isMagnus: true, isBusy: true, lastMessageDate: 5_000 },
+		];
+		assert.strictEqual(selectPrimaryMagnusSession(sessions)?.id, 'busy-old');
+	});
+
+	test('non-Magnus sessions are always ignored', () => {
+		const sessions = [
+			{ id: 'copilot', isMagnus: false, isBusy: true, lastMessageDate: 9_000 },
+			{ id: 'other', isMagnus: false, isBusy: false, lastMessageDate: 8_000 },
+		];
+		assert.strictEqual(selectPrimaryMagnusSession(sessions), undefined);
+	});
+
+	test('empty session list returns undefined', () => {
+		assert.strictEqual(selectPrimaryMagnusSession([]), undefined);
+	});
+
+	test('single Magnus session is returned', () => {
+		const sessions = [
+			{ id: 'solo', isMagnus: true, isBusy: false, lastMessageDate: 1_000 },
+		];
+		assert.strictEqual(selectPrimaryMagnusSession(sessions)?.id, 'solo');
+	});
+});
+
+suite('Auth UI styling contracts', () => {
+
+	test('auth card border-radius is 16px (was 10px)', () => {
+		const source = readRepo('src/vs/workbench/contrib/prebase/browser/prebaseStartupAuthContribution.ts');
+		const cardStart = source.indexOf('prebase-startup-auth-card');
+		assert.ok(cardStart >= 0, 'must locate auth card');
+		const cardRegion = source.slice(cardStart, cardStart + 500);
+		assert.match(cardRegion, /borderRadius:\s*'16px'/,
+			'auth card must use 16px border-radius (was 10px)');
+		assert.doesNotMatch(cardRegion, /borderRadius:\s*'10px'/,
+			'old 10px border-radius must not appear in auth card');
+	});
+
+	test('provider buttons have 12px border-radius (was 5px)', () => {
+		const source = readRepo('src/vs/workbench/contrib/prebase/browser/prebaseStartupAuthContribution.ts');
+		// Find the provider button styling block
+		const btnStart = source.indexOf('borderRadius: \'12px\'');
+		assert.ok(btnStart >= 0, 'must have 12px button radius');
+		// Verify it's within the button style block (not the card)
+		const btnRegion = source.slice(Math.max(0, btnStart - 300), btnStart + 100);
+		assert.match(btnRegion, /button.*style|createElement\('button'\)/,
+			'12px radius must apply to provider buttons');
+	});
+
+	test('backdrop blur is 8px (was 6px)', () => {
+		const source = readRepo('src/vs/workbench/contrib/prebase/browser/prebaseStartupAuthContribution.ts');
+		assert.match(source, /backdropFilter:\s*'blur\(8px\)/,
+			'backdrop blur must be 8px');
+		assert.doesNotMatch(source, /backdropFilter:\s*'blur\(6px\)/,
+			'old 6px blur must not appear');
+	});
+
+	test('hover/focus/pressed states are injected via style element', () => {
+		const source = readRepo('src/vs/workbench/contrib/prebase/browser/prebaseStartupAuthContribution.ts');
+		assert.match(source, /\.prebase-startup-auth-card button:not\(:disabled\):hover/);
+		assert.match(source, /\.prebase-startup-auth-card button:not\(:disabled\):active/);
+		assert.match(source, /\.prebase-startup-auth-card button:focus-visible/);
+		assert.match(source, /transform:\s*scale\(0\.985\)/,
+			'pressed state must use scale transform');
+	});
+
+	test('offline button has distinct styling from provider buttons', () => {
+		const source = readRepo('src/vs/workbench/contrib/prebase/browser/prebaseStartupAuthContribution.ts');
+		assert.match(source, /prebase-offline-btn/);
+		const offlineStart = source.indexOf('prebase-offline-btn');
+		const offlineRegion = source.slice(offlineStart, offlineStart + 400);
+		assert.match(offlineRegion, /borderRadius:\s*'12px'/);
+		assert.match(offlineRegion, /background:\s*'transparent'/);
 	});
 });
 

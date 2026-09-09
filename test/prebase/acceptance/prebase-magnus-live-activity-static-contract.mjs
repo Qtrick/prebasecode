@@ -215,7 +215,7 @@ if (!native.includes('emit:@"dismissAttention"')) {
 		// Geometry constants: height max upgraded to 200, width legacy alias preserved
 		if (!/kExpandedHeightMin = 72/.test(native)
 			|| !/kExpandedHeightMax = 220/.test(native)
-			|| !/kExpandedWidthPad = 28/.test(native)
+			|| !/kExpandedWidthPad\b.*=\s*28/.test(native)
 			|| !/kExpandedWidthStandardPad = 36/.test(native)
 			|| !/kExpandedWidthWidePad = 84/.test(native)
 			|| !/kContentMinScrollHeight = 24/.test(native)

@@ -294,7 +294,7 @@ test('native source keeps natural expanded width + truthful Approve/Deny in-flig
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	assert.match(native, /kExpandedHeightMin = 72/);
 	assert.match(native, /kExpandedHeightMax = 220/);
-	assert.match(native, /kExpandedWidthPad = 28/);
+	assert.match(native, /kExpandedWidthPad\b.*=\s*28/);
 	assert.match(native, /kExpandedWidthStandardPad = 36/);
 	assert.match(native, /kExpandedWidthWidePad = 84/);
 	assert.match(native, /kContentMinScrollHeight = 24/);
@@ -404,9 +404,9 @@ assert.ok(snap.recentActions.every(a => typeof a.label === 'string' && a.label.l
 
 test('native notch polish contracts: optical shoulder, true viewport, action id reconcile, footer gutter', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
-	assert.match(native, /kOpticalShoulderInsetMin = 8/);
-	// kExpandedShoulderRMin/kExpandedShoulderRMax removed — effShoulderR is now hardcoded to 6.0 for broad-top expanded geometry.
-	assert.match(native, /CGFloat effR = 6\.0/);
+	assert.match(native, /kOpticalShoulderInsetMin\b.*=\s*8/);
+	// effShoulderR is now dynamic: 18pt for expanded (housing-anchored flare), 6pt for compact
+	assert.match(native, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/);
 	assert.match(native, /kContentFooterGutter = 8/);
 	assert.match(native, /colorWithCalibratedWhite:0\.0 alpha:1\.0/);
 	assert.match(native, /shapeMaskLayer/);
@@ -578,7 +578,7 @@ test('status badge content safe inset: wider safe zone prevents right-edge clipp
 		'base content inset must be 14pt so notched effective safe inset = MAX(14,18)+8 = 26pt');
 	// ContentSafeInsetX for notched must use the dynamic effShoulderR (not fixed kExpandedShoulderRMin)
 	const contentSafeStart = native.indexOf('static CGFloat ContentSafeInsetX');
-	const contentSafeFn = contentSafeStart >= 0 ? native.slice(contentSafeStart, contentSafeStart + 300) : '';
+	const contentSafeFn = contentSafeStart >= 0 ? native.slice(contentSafeStart, contentSafeStart + 500) : '';
 	assert.match(contentSafeFn, /MAX\(kContentInsetX, effShoulderR\) \+ kContentSafeExtraX/,
 		'ContentSafeInsetX must compute MAX(kContentInsetX, effShoulderR) + kContentSafeExtraX');
 });
@@ -599,7 +599,7 @@ test('width buckets are purely semantic — no streaming-induced width churn', (
 		'width must not depend on raw pending content length (causes streaming churn)');
 });
 
-test('premium control dimensions contract: 28pt controls, 10pt composer radius, 6pt shoulder', () => {
+test('premium control dimensions contract: 28pt controls, 12pt composer radius, 18pt expanded shoulder', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	// Control height upgraded from 24 to 28pt for premium feel
 	assert.match(native, /kControlHeight = 28/,
@@ -607,12 +607,16 @@ test('premium control dimensions contract: 28pt controls, 10pt composer radius, 
 	// Icon buttons also 28pt
 	assert.match(native, /kIconControlSize = 28/,
 		'icon control size must be 28pt to match composer height (was 24pt)');
-	// Composer corner radius upgraded from 7 to 10pt
-	assert.match(native, /kComposerCornerRadius = 10/,
-		'composer corner radius must be 10pt (was 7 — looked cheap)');
-	// Shoulder radius is now hardcoded to 6pt for broad-top expanded geometry (was 40pt max for narrow-neck)
-	assert.match(native, /CGFloat effR = 6\.0/,
-		'shoulder radius must be 6pt for broad-top expanded geometry');
+	// Composer corner radius changed from 10 to 12pt for softer feel
+	assert.match(native, /kComposerCornerRadius = 12/,
+		'composer corner radius must be 12pt (was 10 — upgraded for softer feel)');
+	assert.doesNotMatch(native, /kComposerCornerRadius = 10[^0-9]/,
+		'old 10pt composer radius must not appear in code');
+	// Shoulder radius is now 18pt for expanded (housing-anchored flare), 6pt for compact
+	assert.match(native, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/,
+		'expanded shoulder must be 18pt, compact must be 6pt');
+	assert.doesNotMatch(native, /CGFloat effR = 6\.0;/,
+		'expanded must NOT use the old flat 6pt shoulder');
 	// Steep Bezier tangent for shallow shoulders (kKappa ≈ 0.552)
 	assert.match(native, /kKappa = 0\.55/,
 		'shoulder Bezier CP must use kKappa tangent offset');
@@ -622,5 +626,75 @@ test('premium control dimensions contract: 28pt controls, 10pt composer radius, 
 	// Symbol size upgraded to 11.5pt to fill 28pt buttons
 	assert.match(native, /configurationWithPointSize:11\.5 weight:NSFontWeightMedium/,
 		'icon symbol must be 11.5pt (was 10.5pt — too small for 28pt buttons)');
+	// Button corner radius 10pt for rounded action buttons
+	assert.match(native, /kButtonCornerRadius = 10/,
+		'button corner radius must be 10pt');
+	// Bottom corner radius changed from 22 to 18 for asymmetric curvature
+	assert.match(native, /kBottomCornerRadius = 18/,
+		'bottom corner radius must be 18pt (was 22 — asymmetric top/bottom)');
+	assert.doesNotMatch(native, /kBottomCornerRadius = 22/,
+		'old 22pt bottom radius must not appear');
+});
+
+test('housing-anchored expanded geometry: top boundary is NOT full panel width', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	const expandedBlock = native.slice(
+		native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+		native.indexOf('COMPACT/PILL GEOMETRY'),
+	);
+
+	// Expanded MoveTo starts at housing edge (notchLeft), NOT panel origin (0,0)
+	assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, notchLeft, 0\)/,
+		'expanded MoveTo must anchor at housing left edge (notchLeft), not panel origin (0,0)');
+	// Must NOT start at (0,0)
+	assert.doesNotMatch(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
+		'expanded MoveTo must NOT be at (0,0) — that is compact only');
+
+	// Top edge traverses housing width only
+	assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, notchCenter, 0\)/);
+	assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, notchRight, 0\)/);
+
+	// Shoulder curves flare outward from housing to body walls
+	assert.match(expandedBlock, /shoulderDrop = 20\.0/);
+	assert.match(expandedBlock, /shoulderCurve = effShoulderR/);
+	assert.match(expandedBlock, /The expanded surface emerges FROM the physical camera housing/);
+	assert.match(expandedBlock, /the full panel width/);
+});
+
+test('expanded shoulder radius is 18pt for housing-anchored flare', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	const computeBlock = native.slice(
+		native.indexOf('ComputeSilhouetteShoulderMetrics'),
+		native.indexOf('return metrics'),
+	);
+	// Expanded: 18pt shoulder; Compact: 6pt shoulder
+	assert.match(computeBlock, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/);
+	assert.match(computeBlock, /metrics\.effShoulderR = effR/);
+	assert.match(computeBlock, /metrics\.opticalInset = effR/);
+	assert.match(computeBlock, /metrics\.flare = effR/);
+	assert.doesNotMatch(computeBlock, /CGFloat effR = 22;/);
+	assert.doesNotMatch(computeBlock, /CGFloat effR = 30;/);
+	assert.doesNotMatch(computeBlock, /CGFloat effR = 40;/);
+});
+
+test('bottom corner radius is 18pt (asymmetric top/bottom)', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	assert.match(native, /kBottomCornerRadius = 18/);
+});
+
+test('auth card uses 16px border-radius, provider buttons use 12px', () => {
+	const source = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseStartupAuthContribution.ts'), 'utf8');
+	// Auth card border-radius
+	assert.match(source, /borderRadius:\s*'16px'/,
+		'auth card must use 16px border-radius');
+	// Provider button border-radius
+	const btnMatches = source.match(/borderRadius:\s*'12px'/g);
+	assert.ok(btnMatches && btnMatches.length >= 2,
+		'must have multiple 12px border-radius values (buttons + offline)');
+	// Backdrop blur
+	assert.match(source, /backdropFilter:\s*'blur\(8px\)/,
+		'backdrop blur must be 8px');
+	assert.doesNotMatch(source, /backdropFilter:\s*'blur\(6px\)/,
+		'old 6px blur must not appear');
 });
 

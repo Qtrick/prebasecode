@@ -107,28 +107,73 @@ export class PreBaseStartupAuthContribution extends Disposable implements IWorkb
 			display: 'grid',
 			placeItems: 'center',
 			background: 'color-mix(in srgb, var(--vscode-editor-background) 72%, transparent)',
-			backdropFilter: 'blur(6px)',
+			backdropFilter: 'blur(8px)',
 			transition: `opacity ${PreBaseStartupAuthContribution.AUTH_OVERLAY_CLOSE_DURATION}ms ease-out, backdrop-filter ${PreBaseStartupAuthContribution.AUTH_OVERLAY_CLOSE_DURATION}ms ease-out`,
 		});
 		const card = DOM.append(overlay, DOM.$('.prebase-startup-auth-card'));
-		Object.assign(card.style, { width: 'min(440px, calc(100vw - 40px))', padding: '32px', boxSizing: 'border-box', border: '1px solid var(--vscode-widget-border)', borderRadius: '10px', background: 'color-mix(in srgb, var(--vscode-editorWidget-background) 96%, transparent)', color: 'var(--vscode-foreground)', boxShadow: '0 12px 36px var(--vscode-widget-shadow)' });
+		Object.assign(card.style, {
+			width: 'min(420px, calc(100vw - 48px))',
+			padding: '36px 32px 28px',
+			boxSizing: 'border-box',
+			border: '1px solid color-mix(in srgb, var(--vscode-widget-border) 60%, transparent)',
+			borderRadius: '16px',
+			background: 'color-mix(in srgb, var(--vscode-editorWidget-background) 96%, transparent)',
+			color: 'var(--vscode-foreground)',
+			boxShadow: '0 16px 48px rgba(0,0,0,0.32), 0 2px 8px rgba(0,0,0,0.16)',
+		});
 		const logo = DOM.append(card, mainWindow.document.createElement('img'));
 		logo.src = FileAccess.asBrowserUri('vs/workbench/contrib/prebase/browser/media/prebase-logo.png').toString(true);
 		logo.alt = 'PreBase';
-		Object.assign(logo.style, { width: '44px', height: '44px', display: 'block', margin: '0 auto 16px' });
+		Object.assign(logo.style, { width: '48px', height: '48px', display: 'block', margin: '0 auto 14px', borderRadius: '12px' });
 		const title = DOM.append(card, mainWindow.document.createElement('h1'));
 		title.textContent = 'PreBase';
-		Object.assign(title.style, { textAlign: 'center', fontSize: '24px', margin: '0 0 8px' });
+		Object.assign(title.style, { textAlign: 'center', fontSize: '22px', fontWeight: '600', margin: '0 0 6px' });
 		const copy = DOM.append(card, mainWindow.document.createElement('p'));
 		copy.textContent = this.accountService.apiConfigured ? localize('prebase.auth.copy', 'Sign in to sync your optional PreBase account.') : localize('prebase.auth.localCopy', 'Cloud sign-in is not configured. You can use PreBase locally.');
-		Object.assign(copy.style, { textAlign: 'center', color: 'var(--vscode-descriptionForeground)', margin: '0 0 20px' });
+		Object.assign(copy.style, { textAlign: 'center', color: 'var(--vscode-descriptionForeground)', margin: '0 0 24px', fontSize: '13px', lineHeight: '1.4' });
+		// Hover/focus/pressed states (injected once)
+		const hoverStyle = mainWindow.document.createElement('style');
+		hoverStyle.textContent = `
+			.prebase-startup-auth-card button:not(:disabled):hover {
+				background: color-mix(in srgb, var(--vscode-button-secondaryBackground) 85%, var(--vscode-button-secondaryForeground)) !important;
+				border-color: color-mix(in srgb, var(--vscode-button-border, var(--vscode-widget-border)) 70%, var(--vscode-button-secondaryForeground)) !important;
+			}
+			.prebase-startup-auth-card button:not(:disabled):active {
+				transform: scale(0.985);
+			}
+			.prebase-startup-auth-card button:focus-visible {
+				outline: 2px solid var(--vscode-focusBorder);
+				outline-offset: 2px;
+			}
+			.prebase-startup-auth-card .prebase-offline-btn:hover {
+				color: var(--vscode-foreground) !important;
+			}
+		`;
+		overlay.appendChild(hoverStyle);
 		for (const provider of [
 			{ id: 'github' as const, label: localize('prebase.auth.github', 'Continue with GitHub'), logo: 'vs/workbench/contrib/chat/browser/chatSetup/media/github.svg' },
 			{ id: 'google' as const, label: localize('prebase.auth.google', 'Continue with Google'), logo: 'vs/workbench/contrib/chat/browser/chatSetup/media/google.svg' },
 		] as const) {
 			const button = DOM.append(card, mainWindow.document.createElement('button'));
 			button.disabled = !this.accountService.apiConfigured;
-			Object.assign(button.style, { width: '100%', minHeight: '42px', marginBottom: '10px', border: '1px solid var(--vscode-button-border, var(--vscode-widget-border))', borderRadius: '5px', background: 'var(--vscode-button-secondaryBackground)', color: 'var(--vscode-button-secondaryForeground)', cursor: 'pointer', display: 'grid', gridTemplateColumns: '20px 1fr 20px', alignItems: 'center', columnGap: '8px' });
+			Object.assign(button.style, {
+				width: '100%',
+				minHeight: '44px',
+				marginBottom: '10px',
+				border: '1px solid var(--vscode-button-border, var(--vscode-widget-border))',
+				borderRadius: '12px',
+				background: 'var(--vscode-button-secondaryBackground)',
+				color: 'var(--vscode-button-secondaryForeground)',
+				cursor: 'pointer',
+				display: 'grid',
+				gridTemplateColumns: '20px 1fr 20px',
+				alignItems: 'center',
+				columnGap: '10px',
+				padding: '0 14px',
+				fontSize: '14px',
+				fontWeight: '500',
+				transition: 'background 120ms ease, border-color 120ms ease, transform 80ms ease',
+			});
 			const providerLogo = DOM.append(button, mainWindow.document.createElement('img'));
 			providerLogo.src = FileAccess.asBrowserUri(provider.logo).toString(true);
 			providerLogo.alt = '';
@@ -141,8 +186,21 @@ export class PreBaseStartupAuthContribution extends Disposable implements IWorkb
 			this._overlayDisposables.add(DOM.addDisposableListener(button, 'click', () => void this._signIn(provider.id)));
 		}
 		const offline = DOM.append(card, mainWindow.document.createElement('button'));
+		offline.className = 'prebase-offline-btn';
 		offline.textContent = localize('prebase.auth.continueOffline', 'Continue Offline');
-		Object.assign(offline.style, { width: '100%', minHeight: '38px', border: '0', background: 'transparent', color: 'var(--vscode-textLink-foreground)', cursor: 'pointer' });
+		Object.assign(offline.style, {
+			width: '100%',
+			minHeight: '40px',
+			marginTop: '4px',
+			border: '1px solid color-mix(in srgb, var(--vscode-widget-border) 50%, transparent)',
+			borderRadius: '12px',
+			background: 'transparent',
+			color: 'var(--vscode-descriptionForeground)',
+			cursor: 'pointer',
+			fontSize: '13px',
+			fontWeight: '500',
+			transition: 'background 120ms ease, color 120ms ease',
+		});
 		this._overlayDisposables.add(DOM.addDisposableListener(offline, 'click', () => this._continueOffline()));
 		this._overlayDisposables.add(DOM.addDisposableListener(overlay, 'keydown', event => { if (event.key === 'Escape') { event.preventDefault(); this._continueOffline(); } }));
 		this._overlay = overlay;

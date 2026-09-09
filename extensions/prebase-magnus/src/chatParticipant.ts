@@ -477,17 +477,25 @@ async function handleChatRequest(
 							// Fall through
 						}
 
-						rawText = 'The model returned an empty response. Please retry or choose another model.';
+						rawText = 'The model returned an empty response, possibly due to rate limiting or safety filtering. Try again or select a different model.';
 						break;
 					}
 				}
 
 				if (result.disposition === 'malformed') {
-					rawText = 'The model returned an unparseable or empty response. Please check your provider configuration or choose another model.';
+					// Malformed responses often indicate transient provider issues or
+					// credential problems. Provide actionable guidance.
+					const isRetryable = iteration < assembled.budget.maxProviderRounds - 1;
+					if (isRetryable) {
+						// One automatic retry for malformed responses — may be transient
+						rawText = '';
+						continue;
+					}
+					rawText = 'The model returned an unparseable response. Check your API key, ensure the model is available in your region, or select a different model.';
 					break;
 				}
 
-				rawText = 'The model completed without returning visible text. Please retry or choose another model.';
+				rawText = 'The model completed without returning visible text. Try rephrasing or choosing a different model.';
 				break;
 			}
 		} catch (err) {

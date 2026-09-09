@@ -3805,10 +3805,9 @@ async function run() {
 		if (sm.nonDegenerateShoulder !== true) {
 			throw new Error(`natural-width interactive must report nonDegenerateShoulder=true (flare=${flare}, optical=${optical}, effR=${effR})`);
 		}
-		// Broad-top expanded geometry: shoulder is always shallow (6pt).
-		// The meaningful metric is the top-attachment-to-body ratio, not shoulder radius.
-		if (!(effR >= 5 && effR <= 8)) {
-			throw new Error(`effShoulderR must be ~6 for broad-top expanded geometry, got ${effR}`);
+		// Housing-anchored expanded geometry: shoulder is 18pt for pronounced flare.
+		if (!(effR >= 16 && effR <= 20)) {
+			throw new Error(`effShoulderR must be ~18 for housing-anchored expanded geometry, got ${effR}`);
 		}
 		if (diag.shapeMaskSynced !== true && diag.shapeMaskSynced !== undefined) {
 			throw new Error(`shapeMaskSynced should be true when path exists, got ${diag.shapeMaskSynced}`);
