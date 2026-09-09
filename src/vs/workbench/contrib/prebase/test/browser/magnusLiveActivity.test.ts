@@ -2136,7 +2136,7 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 
 	test('TS geometry constants stay aligned with native height/width/wing model', () => {
 		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, 72);
-		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 200);
+		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 220);
 		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_WIDTH_PAD, 28);
 		assert.strictEqual(LIVE_ACTIVITY_WING_WIDTH_DEFAULT, 64);
 		assert.strictEqual(LIVE_ACTIVITY_WING_WIDTH, 64);

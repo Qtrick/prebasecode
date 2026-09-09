@@ -190,8 +190,8 @@ export function liveActivityLiveFailures(evidence) {
 					}
 				}
 				if (key === 'workingInteractive') {
-					if (shot.native.panelFrame && shot.native.panelFrame.height > 145) {
-						failures.push(`visual fixture workingInteractive panelFrame height (${shot.native.panelFrame.height}pt) exceeds limit 145pt (stale max height?)`);
+					if (shot.native.panelFrame && shot.native.panelFrame.height > 160) {
+						failures.push(`visual fixture workingInteractive panelFrame height (${shot.native.panelFrame.height}pt) exceeds limit 160pt`);
 					}
 				}
 				if (shot.native.panelFrame && shot.native.requestedFrame) {

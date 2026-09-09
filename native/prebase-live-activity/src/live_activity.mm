@@ -27,8 +27,8 @@ static const CGFloat kContentSafeExtraX = 8;
 /** Mandatory gutter between scroll content and footer controls (pt). */
 static const CGFloat kContentFooterGutter = 8;
 /** Expanded organic shoulder radius range — visible concave fillet connecting housing to body. */
-static const CGFloat kExpandedShoulderRMin = 18.0;
-static const CGFloat kExpandedShoulderRMax = 32.0;
+static const CGFloat kExpandedShoulderRMin = 22.0;
+static const CGFloat kExpandedShoulderRMax = 40.0;
 
 /** Content layout tokens — measured stacking with reserved footer. */
 static const CGFloat kContentInsetX = 14;
@@ -41,7 +41,7 @@ static const CGFloat kIconControlSize = 28;
 static const CGFloat kComposerCornerRadius = 10;
 static const CGFloat kActionRowHeight = 15;
 /** Max is an overflow guard; natural height is content-measured (never the default). */
-static const CGFloat kExpandedHeightMax = 200;
+static const CGFloat kExpandedHeightMax = 220;
 static const CGFloat kExpandedHeightMin = 72;
 /** Width pad constants for semantic state buckets (COMPACT / STANDARD / WIDE). */
 static const CGFloat kExpandedWidthPad = 28;       // legacy alias — kept for static contract
@@ -384,8 +384,8 @@ static SilhouetteShoulderMetrics ComputeSilhouetteShoulderMetrics(
 	CGFloat effR = 6.0;
 	if (isExpanded && depth > 0.5) {
 		// Expanded: organic shoulder radius scales with body depth for a natural "emerging" curve.
-		// Range [18, 28] produces a clearly visible concave shoulder without harsh horns.
-		effR = MIN(kExpandedShoulderRMax, MAX(kExpandedShoulderRMin, depth * 0.22));
+		// Range [22, 40] produces a pronounced concave shoulder — clearly reads as notch-origin.
+		effR = MIN(kExpandedShoulderRMax, MAX(kExpandedShoulderRMin, depth * 0.30));
 	} else if (!isExpanded) {
 		effR = 6.0;
 	}
@@ -499,9 +499,9 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		CGPathAddLineToPoint(path, NULL, 0, effShoulderR);
 
 		// 2. Left concave organic shoulder: from (0, effShoulderR) curving up to (notchLeft, 0)
-		//    Gentler C1 tangent: use 0.45*R as the vertical CP offset for organic arc entry.
+		//    Steeper C1 tangent: 0.55*R vertical CP offset for a pronounced concave arc.
 		CGPathAddCurveToPoint(path, NULL,
-			0, effShoulderR * 0.45,
+			0, effShoulderR * 0.55,
 			notchLeft + (2.0 / 3.0) * (-notchLeft), 0,
 			notchLeft, 0);
 
@@ -515,10 +515,10 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
 		// 6. Right concave organic shoulder: from (notchRight, 0) curving down to (totalW, effShoulderR)
-		//    Matching gentler C1 tangent for symmetry — body at full width.
+		//    Matching steeper C1 tangent for symmetry — body at full width.
 		CGPathAddCurveToPoint(path, NULL,
 			notchRight + (2.0 / 3.0) * (totalW - notchRight), 0,
-			totalW, effShoulderR * 0.45,
+			totalW, effShoulderR * 0.55,
 			totalW, effShoulderR);
 
 		// 7. LineTo: down right wall to bottom-right corner start (totalW, currentH - effBottomR)
@@ -1326,7 +1326,7 @@ static NSString *JSString(Napi::Value value) {
 	// Document-local stacking with overflow allowed (scroll handles excess).
 	CGFloat docY = 2;
 	CGFloat docMax = 10000; // unbounded for measurement; scroll clips
-	CGFloat docContentW = MAX(40, totalW - (kContentInsetX + kContentSafeExtraX) * 2);
+	CGFloat docContentW = MAX(40, totalW - ContentSafeInsetX(self.notched, self.cachedEffShoulderR) * 2);
 	BOOL hasPending = self.pendingTitle.length > 0 || self.pendingMessage.length > 0;
 	BOOL ok = YES;
 	if (ok && self.pendingTitle.length) {
@@ -2185,9 +2185,12 @@ static NSString *JSString(Napi::Value value) {
 	if (st < PrebasePresentationStateInteractiveWorking || st > PrebasePresentationStateInteractiveApproval) {
 		return 0;
 	}
-	// Must match layoutControls bottom-up stack (composer + approval + option rows + pads).
+	// Must match layoutControls: bottomY = bodyH - kControlHeight - effBottomR - 5.
+	// The scroll viewport must end above the TOP of the first control row, not below the
+	// corner radius. So this returns the height from the first control row to body bottom
+	// (including effBottomR + 5 which is the gap below the last row).
 	if (st == PrebasePresentationStateInteractiveApproval) {
-		return kControlHeight + 7;
+		return kControlHeight + kBottomCornerRadius + 5;
 	}
 	BOOL hasOptions = (st == PrebasePresentationStateInteractiveQuestion && self.pendingOptions.count > 0);
 	if (hasOptions) {
@@ -2198,9 +2201,9 @@ static NSString *JSString(Napi::Value value) {
 		if (totalOpts > 4) {
 			rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
 		}
-		return rows * kControlHeight + MAX(0, rows - 1) * 4 + 7;
+		return rows * kControlHeight + MAX(0, rows - 1) * 4 + kBottomCornerRadius + 5;
 	}
-	return kControlHeight + 7;
+	return kControlHeight + kBottomCornerRadius + 5;
 }
 
 /** Geometry signature — incorporates semantic state (status, kind, interactionId, options, actions); raw character counts are excluded so streaming text never morphs geometry. */
@@ -2276,7 +2279,9 @@ static NSString *JSString(Napi::Value value) {
 		self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
 	CGFloat totalW = [self computeExpandedWidth:naturalW];
 	// Path-aware safe inset: body is full width, content inset is kContentInsetX + safe extra.
-	CGFloat sideInset = kContentInsetX + kContentSafeExtraX;
+	// For notched displays, effShoulderR can be larger than kContentInsetX, so use MAX.
+	// Use kExpandedShoulderRMax as conservative estimate — cachedEffShoulderR is stale during height computation.
+	CGFloat sideInset = ContentSafeInsetX(self.content.notched, kExpandedShoulderRMax);
 	CGFloat contentW = MAX(40, totalW - sideInset * 2);
 	CGFloat h = bandH + kContentInsetTop;
 	h += kHeaderRowHeight + kContentGap;
@@ -2309,20 +2314,21 @@ static NSString *JSString(Napi::Value value) {
 	}
 	h += [self computeControlsStackHeight];
 	h += kContentFooterGutter;
-	h += 8; // Bottom corner inset
+	// Bottom corner inset (+8) was a legacy filler — now folded into computeControlsStackHeight
+	// via kBottomCornerRadius + 5 which matches the actual layoutControls bottomY offset.
 
 	// Enforce minimum usable scroll viewport for working interactive states.
 	// The old MIN(114.0, h) cap created a ~16pt usable area — unusable for real content.
 	// New floor: always leave kContentMinScrollHeight usable scroll area above the footer.
 	if (!hasPending) {
-		CGFloat footerReserve = [self computeControlsStackHeight] + kContentFooterGutter + 8;
+		CGFloat footerReserve = [self computeControlsStackHeight] + kContentFooterGutter;
 		CGFloat minH = bandH + kContentInsetTop + kHeaderRowHeight + kContentGap + kContentMinScrollHeight + footerReserve;
 		h = MAX(h, minH);
 	}
 	// For approval state, cap to a comfortable height within the wider panel (WIDE bucket).
 	// With kExpandedWidthWidePad=84pt more width, content wraps shorter so we allow taller max.
 	if ([self.pendingKind isEqualToString:@"approval"]) {
-		h = MIN(170.0, h);
+		h = MIN(190.0, h);
 	}
 
 	CGFloat target = MIN(kExpandedHeightMax, MAX(kExpandedHeightMin, h));

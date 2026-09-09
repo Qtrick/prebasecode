@@ -168,7 +168,7 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 					this._workerTerminated = true;
 					this._invalidateWorker();
 				}
-			});
+			}).catch(() => { /* worker termination observer failed */ });
 			return worker.client.getChannel(CANONICAL_PARSER_WORKER_CHANNEL);
 		} catch (error) {
 			this._workerPromise = undefined;

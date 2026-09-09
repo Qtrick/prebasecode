@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "40d5c28a4c612fe521a7e552647cfdd97948987f",
-  "sourceFingerprint": "744bdf9b5f4ac5fcd88a94f8165c936d487b883d63aac178b14273a835271059",
-  "productFingerprint": "744bdf9b5f4ac5fcd88a94f8165c936d487b883d63aac178b14273a835271059",
-  "generatedAt": "2026-09-08T20:32:58.586Z",
+  "sourceHead": "bfa34eb61fc66d6a9f44b0c7465746393ba643f7",
+  "sourceFingerprint": "f3e3de0d1e5c8b8f0411c4d135c50c3a977c59399666dad755af18f89d171afa",
+  "productFingerprint": "f3e3de0d1e5c8b8f0411c4d135c50c3a977c59399666dad755af18f89d171afa",
+  "generatedAt": "2026-09-09T02:37:49.172Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -111,7 +111,7 @@
           "semanticContentSubtree": "compactContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 54575,
+          "windowNumber": 62061,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -128,7 +128,7 @@
           "revision": 1,
           "hoverSessionToken": 0,
           "shapeMaskSynced": true,
-          "buildFingerprint": "native-vSep  8 2026-14:29:41",
+          "buildFingerprint": "native-vSep  8 2026-22:37:35",
           "composerFrame": null,
           "screenLocalizedName": "Built-in Retina Display",
           "pendingMessageFullyVisible": true,
@@ -178,7 +178,7 @@
               "height": 0
             }
           ],
-          "buildTimestamp": "Sep  8 2026 14:29:41",
+          "buildTimestamp": "Sep  8 2026 22:37:35",
           "auxiliaryTopLeftArea": {
             "y": 950,
             "x": 0,
@@ -310,7 +310,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9488,
+        "durationRealCyclesMs": 9627,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -324,14 +324,14 @@
           "safeAreaTop": 32,
           "denyButtonAlpha": 1,
           "openButtonTitle": "Open in PreBase",
-          "actualVisibleViewportBottom": 73,
+          "actualVisibleViewportBottom": 65,
           "contentScrollOffset": 0,
           "trackingAreaCount": 1,
           "contentSafeViewport": {
             "y": 25,
-            "x": 33.519999999999996,
-            "width": 281.96000000000004,
-            "height": 48
+            "x": 46.4,
+            "width": 256.2,
+            "height": 40
           },
           "denyButtonFrame": null,
           "environmentState": "available",
@@ -350,7 +350,7 @@
             "y": 0,
             "x": 0,
             "width": 349,
-            "height": 116
+            "height": 128
           },
           "expanded": true,
           "backingScaleFactor": 2,
@@ -358,8 +358,8 @@
           "bandHeight": 34,
           "activityFrame": {
             "y": 2,
-            "x": 33.519999999999996,
-            "width": 305,
+            "x": 46.4,
+            "width": 256.2,
             "height": 15
           },
           "panelVisible": true,
@@ -367,18 +367,18 @@
           "interactiveContentVisible": true,
           "transitionInFlight": false,
           "silhouetteMetrics": {
-            "topLeftX": 25.52,
-            "topRightX": 323.48,
-            "bodyDepth": 116,
-            "shoulderFlare": 25.52,
-            "contentSafeInsetX": 33.519999999999996,
-            "effShoulderR": 25.52,
+            "topLeftX": 38.4,
+            "topRightX": 310.6,
+            "bodyDepth": 128,
+            "shoulderFlare": 38.4,
+            "contentSafeInsetX": 46.4,
+            "effShoulderR": 38.4,
             "notchCenter": 174.5,
             "nonDegenerateShoulder": true,
-            "cachedEffShoulderR": 25.52,
+            "cachedEffShoulderR": 38.4,
             "panelWidth": 349,
             "shoulderCurvatureContinuous": true,
-            "opticalTopInset": 25.52,
+            "opticalTopInset": 38.4,
             "tangentContinuity": true
           },
           "lastHapticReason": "none",
@@ -386,17 +386,17 @@
           "approveButtonTitle": "Approve",
           "statusBadgeFrame": {
             "y": 6,
-            "x": 269.03479496717455,
+            "x": 256.15479496717455,
             "width": 46.44520503282547,
             "height": 16
           },
           "semanticContentSubtree": "expandedContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 54575,
+          "windowNumber": 62061,
           "openButtonFrame": {
-            "y": 81,
-            "x": 287.48,
+            "y": 73,
+            "x": 274.6,
             "width": 28,
             "height": 28
           },
@@ -404,7 +404,7 @@
             "y": 25,
             "x": 0,
             "width": 349,
-            "height": 48
+            "height": 40
           },
           "collapsedHit": {
             "y": 948,
@@ -415,38 +415,38 @@
           "globalMonitorInstalled": false,
           "lastTransitionReason": "geometry",
           "approveButtonAlpha": 1,
-          "inactiveSubtreesSuppressed": true,
+          "inactiveSubtreesSuppressed": false,
           "renderedPeekBody": "",
           "revision": 406,
           "hoverSessionToken": 0,
           "shapeMaskSynced": true,
           "displayMode": "builtin",
           "composerFrame": {
-            "y": 81,
-            "x": 33.519999999999996,
-            "width": 213.96000000000004,
+            "y": 73,
+            "x": 46.4,
+            "width": 188.2,
             "height": 28
           },
-          "buildFingerprint": "native-vSep  8 2026-14:29:41",
+          "buildFingerprint": "native-vSep  8 2026-22:37:35",
           "screenLocalizedName": "Built-in Retina Display",
           "pendingMessageFullyVisible": true,
           "accessibilityRole": "AXGroup",
           "expandedContainerVisible": true,
           "panelFrame": {
-            "y": 832,
+            "y": 820,
             "x": 581,
             "width": 349,
-            "height": 150
+            "height": 162
           },
           "peekOnly": false,
           "pathBounds": {
             "y": 0,
-            "x": 25.52,
-            "width": 297.96000000000004,
-            "height": 150
+            "x": 0,
+            "width": 349,
+            "height": 162
           },
           "pinned": false,
-          "reservedFooterHeight": 43,
+          "reservedFooterHeight": 63,
           "panelCreated": true,
           "hapticCount": 0,
           "activityLabel": "Validating Temporal layout recovery",
@@ -459,12 +459,12 @@
           "actionFrames": [
             {
               "y": 20,
-              "x": 35.519999999999996,
-              "width": 303,
+              "x": 48.4,
+              "width": 254.2,
               "height": 15
             }
           ],
-          "buildTimestamp": "Sep  8 2026 14:29:41",
+          "buildTimestamp": "Sep  8 2026 22:37:35",
           "auxiliaryTopLeftArea": {
             "y": 950,
             "x": 0,
@@ -488,13 +488,13 @@
           "latestShortMessage": "Fit View metrics look stable on the large fixture.",
           "questionButtonCount": 0,
           "topAnchorDelta": 0,
-          "pinnedInteractiveHeight": 150,
+          "pinnedInteractiveHeight": 162,
           "lastNativeCommand": "",
           "requestedFrame": {
-            "y": 832,
+            "y": 820,
             "x": 581,
             "width": 349,
-            "height": 150
+            "height": 162
           },
           "transitionGeneration": 200,
           "hoverDwellMs": 180,
@@ -504,7 +504,7 @@
           "pendingTitle": "",
           "userDismissedAttention": false,
           "statusLabel": "Working",
-          "footerTopY": 81,
+          "footerTopY": 73,
           "canonicalTargetPresentationState": "interactiveWorking",
           "approvalControlsVisible": false,
           "actionInFlight": false,
@@ -515,31 +515,31 @@
           "shapeAwareHitTesting": true,
           "questionContentHealthy": true,
           "renderedActivityText": "Validating Temporal layout recovery",
-          "contentDocumentHeight": 48,
+          "contentDocumentHeight": 42,
           "approveButtonFrame": null,
           "layerBacked": true,
           "accessibilityLabel": "Working",
           "interactionId": "",
           "orderFrontCount": 1,
           "shoulderMetrics": {
-            "topLeftX": 25.52,
-            "topRightX": 323.48,
-            "bodyDepth": 116,
-            "shoulderFlare": 25.52,
-            "contentSafeInsetX": 33.519999999999996,
-            "effShoulderR": 25.52,
+            "topLeftX": 38.4,
+            "topRightX": 310.6,
+            "bodyDepth": 128,
+            "shoulderFlare": 38.4,
+            "contentSafeInsetX": 46.4,
+            "effShoulderR": 38.4,
             "notchCenter": 174.5,
             "nonDegenerateShoulder": true,
-            "cachedEffShoulderR": 25.52,
+            "cachedEffShoulderR": 38.4,
             "panelWidth": 349,
             "shoulderCurvatureContinuous": true,
-            "opticalTopInset": 25.52,
+            "opticalTopInset": 38.4,
             "tangentContinuity": true
           },
           "panelTopY": 982,
           "pinButtonFrame": {
-            "y": 81,
-            "x": 253.48000000000002,
+            "y": 73,
+            "x": 240.6,
             "width": 28,
             "height": 28
           },
@@ -557,14 +557,14 @@
           "panelLevel": 2147483630,
           "expandedContentAlpha": 1,
           "denyButtonTitle": "Deny",
-          "compactContainerVisible": false,
+          "compactContainerVisible": true,
           "actionRowIds": [
             "a99"
           ],
           "expandedContainerAlpha": 1,
           "peekLabelFrame": null,
           "canonicalPresentationState": "interactiveWorking",
-          "contentRefreshCount": 303,
+          "contentRefreshCount": 302,
           "pendingTitleFrame": null,
           "geometryTransitionCount": 201,
           "peekContainerAlpha": 0,
@@ -572,8 +572,8 @@
           "pinButtonVisible": true,
           "headerFrame": {
             "y": 6,
-            "x": 33.519999999999996,
-            "width": 227.51479496717457,
+            "x": 46.4,
+            "width": 201.75479496717452,
             "height": 16
           },
           "contentOnlyUpdateCount": 101,
@@ -581,7 +581,7 @@
             "y": 25,
             "x": 0,
             "width": 349,
-            "height": 48
+            "height": 40
           },
           "pathTopologyCompatible": true,
           "openInPreBaseVisible": true,
@@ -595,7 +595,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 357,
+        "durationRetargetMs": 368,
         "diagRetarget": {
           "renderedPendingMessage": "",
           "animationCount": 203,
@@ -643,18 +643,18 @@
           "interactiveContentVisible": false,
           "transitionInFlight": false,
           "silhouetteMetrics": {
-            "topLeftX": 18,
-            "topRightX": 295,
+            "topLeftX": 22,
+            "topRightX": 291,
             "bodyDepth": 32,
-            "shoulderFlare": 18,
-            "contentSafeInsetX": 26,
-            "effShoulderR": 18,
+            "shoulderFlare": 22,
+            "contentSafeInsetX": 30,
+            "effShoulderR": 22,
             "notchCenter": 156.5,
             "nonDegenerateShoulder": true,
             "cachedEffShoulderR": 6,
             "panelWidth": 313,
             "shoulderCurvatureContinuous": true,
-            "opticalTopInset": 18,
+            "opticalTopInset": 22,
             "tangentContinuity": true
           },
           "lastHapticReason": "none",
@@ -664,7 +664,7 @@
           "semanticContentSubtree": "peekContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 54575,
+          "windowNumber": 62061,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -681,7 +681,7 @@
           "revision": 406,
           "hoverSessionToken": 0,
           "shapeMaskSynced": true,
-          "buildFingerprint": "native-vSep  8 2026-14:29:41",
+          "buildFingerprint": "native-vSep  8 2026-22:37:35",
           "composerFrame": null,
           "screenLocalizedName": "Built-in Retina Display",
           "pendingMessageFullyVisible": true,
@@ -712,7 +712,7 @@
             "height": 32
           },
           "actionFrames": [],
-          "buildTimestamp": "Sep  8 2026 14:29:41",
+          "buildTimestamp": "Sep  8 2026 22:37:35",
           "auxiliaryTopLeftArea": {
             "y": 950,
             "x": 0,
@@ -769,18 +769,18 @@
           "interactionId": "",
           "orderFrontCount": 1,
           "shoulderMetrics": {
-            "topLeftX": 18,
-            "topRightX": 295,
+            "topLeftX": 22,
+            "topRightX": 291,
             "bodyDepth": 32,
-            "shoulderFlare": 18,
-            "contentSafeInsetX": 26,
-            "effShoulderR": 18,
+            "shoulderFlare": 22,
+            "contentSafeInsetX": 30,
+            "effShoulderR": 22,
             "notchCenter": 156.5,
             "nonDegenerateShoulder": true,
             "cachedEffShoulderR": 6,
             "panelWidth": 313,
             "shoulderCurvatureContinuous": true,
-            "opticalTopInset": 18,
+            "opticalTopInset": 22,
             "tangentContinuity": true
           },
           "panelTopY": 982,
@@ -809,7 +809,7 @@
             "height": 16
           },
           "canonicalPresentationState": "peek",
-          "contentRefreshCount": 305,
+          "contentRefreshCount": 304,
           "pendingTitleFrame": null,
           "geometryTransitionCount": 203,
           "peekContainerAlpha": 1,
@@ -898,12 +898,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -34,
-        "heapUsedMb": 6.71,
-        "rssDiffKb": 46176,
-        "rssMb": 118.16,
-        "cpuDeltaUserMs": 1035901,
-        "cpuDeltaSystemMs": 189060
+        "heapDiffKb": 13,
+        "heapUsedMb": 6.69,
+        "rssDiffKb": 46224,
+        "rssMb": 119.06,
+        "cpuDeltaUserMs": 1306486,
+        "cpuDeltaSystemMs": 245602
       }
     },
     {
@@ -1186,9 +1186,9 @@
               "isActual": true,
               "requested": {
                 "x": 581,
-                "y": 832,
+                "y": 820,
                 "width": 349,
-                "height": 150
+                "height": 162
               }
             },
             "geometryTransitionCount": 3,
@@ -1208,15 +1208,15 @@
             "targetPresentationState": "interactive",
             "frame": {
               "x": 581,
-              "y": 832,
+              "y": 820,
               "width": 349,
-              "height": 150,
+              "height": 162,
               "isActual": true,
               "requested": {
                 "x": 581,
-                "y": 832,
+                "y": 820,
                 "width": 349,
-                "height": 150
+                "height": 162
               }
             },
             "geometryTransitionCount": 3,
@@ -1298,15 +1298,15 @@
           "localMonitorInstalled": true,
           "frame": {
             "x": 581,
-            "y": 832,
+            "y": 820,
             "width": 349,
-            "height": 150,
+            "height": 162,
             "isActual": true,
             "requested": {
               "x": 581,
-              "y": 832,
+              "y": 820,
               "width": 349,
-              "height": 150
+              "height": 162
             }
           }
         },
@@ -1316,15 +1316,15 @@
           "transitionGeneration": 2,
           "frame": {
             "x": 581,
-            "y": 832,
+            "y": 820,
             "width": 349,
-            "height": 150,
+            "height": 162,
             "isActual": true,
             "requested": {
               "x": 581,
-              "y": 832,
+              "y": 820,
               "width": 349,
-              "height": 150
+              "height": 162
             }
           },
           "lastApplied": {
@@ -1345,15 +1345,15 @@
           "animationCount": 4,
           "frame": {
             "x": 581,
-            "y": 832,
+            "y": 820,
             "width": 349,
-            "height": 150,
+            "height": 162,
             "isActual": true,
             "requested": {
               "x": 581,
-              "y": 832,
+              "y": 820,
               "width": 349,
-              "height": 150
+              "height": 162
             }
           }
         },
@@ -1365,15 +1365,15 @@
           "geometryTransitionCount": 4,
           "frame": {
             "x": 581,
-            "y": 832,
+            "y": 820,
             "width": 349,
-            "height": 150,
+            "height": 162,
             "isActual": true,
             "requested": {
               "x": 581,
-              "y": 832,
+              "y": 820,
               "width": 349,
-              "height": 150
+              "height": 162
             }
           },
           "lastApplied": {
@@ -1562,22 +1562,22 @@
           "state": "interactive",
           "frame": {
             "x": 581,
-            "y": 832,
+            "y": 820,
             "width": 349,
-            "height": 150,
+            "height": 162,
             "isActual": true,
             "requested": {
               "x": 581,
-              "y": 832,
+              "y": 820,
               "width": 349,
-              "height": 150
+              "height": 162
             }
           },
           "transitionGeneration": 1
         },
         "contentGrowth": {
-          "preGrowthHeight": 150,
-          "postGrowthHeight": 180,
+          "preGrowthHeight": 162,
+          "postGrowthHeight": 192,
           "questionButtonCount": 3
         }
       }
@@ -1614,9 +1614,9 @@
             "x": 0,
             "y": 0,
             "maxX": 349,
-            "maxY": 116
+            "maxY": 128
           },
-          "textMaxY": 48,
+          "textMaxY": 42,
           "scrollHostActive": true,
           "state": "pinned",
           "shapeAwareHitTesting": true,
@@ -1630,7 +1630,7 @@
             "x": 0,
             "y": 0,
             "maxX": 349,
-            "maxY": 116
+            "maxY": 128
           },
           "textMaxY": 55,
           "scrollHostActive": true,
@@ -1646,7 +1646,7 @@
             "x": 0,
             "y": 0,
             "maxX": 397,
-            "maxY": 166
+            "maxY": 186
           },
           "textMaxY": 72,
           "scrollHostActive": true,
@@ -1662,9 +1662,9 @@
             "x": 0,
             "y": 0,
             "maxX": 397,
-            "maxY": 127
+            "maxY": 139
           },
-          "textMaxY": 59,
+          "textMaxY": 57,
           "scrollHostActive": true,
           "state": "attentionInteractive",
           "shapeAwareHitTesting": true,
@@ -1714,15 +1714,15 @@
           "state": "interactive",
           "frame": {
             "x": 598,
-            "y": 946,
+            "y": 944,
             "width": 314,
-            "height": 36,
+            "height": 38,
             "isActual": true,
             "requested": {
               "x": 581,
-              "y": 832,
+              "y": 820,
               "width": 349,
-              "height": 150
+              "height": 162
             }
           }
         },
@@ -1730,16 +1730,16 @@
           "state": "pinned",
           "pinned": true,
           "frame": {
-            "x": 589,
-            "y": 884,
-            "width": 333,
-            "height": 98,
+            "x": 587,
+            "y": 867,
+            "width": 336,
+            "height": 115,
             "isActual": true,
             "requested": {
               "x": 581,
-              "y": 832,
+              "y": 820,
               "width": 349,
-              "height": 150
+              "height": 162
             }
           }
         },
@@ -1780,9 +1780,9 @@
           "state": "completedTransient",
           "frame": {
             "x": 599,
-            "y": 946,
+            "y": 945,
             "width": 313,
-            "height": 36,
+            "height": 37,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1816,7 +1816,7 @@
       "details": {
         "heights": {
           "empty": {
-            "height": 150,
+            "height": 162,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1824,16 +1824,16 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 349,
-                "maxY": 116
+                "maxY": 128
               },
-              "textMaxY": 48,
+              "textMaxY": 42,
               "scrollHostActive": true
             },
             "state": "pinned",
             "questionButtonCount": 0
           },
           "short": {
-            "height": 150,
+            "height": 162,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1841,16 +1841,16 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 349,
-                "maxY": 116
+                "maxY": 128
               },
-              "textMaxY": 48,
+              "textMaxY": 42,
               "scrollHostActive": true
             },
             "state": "pinned",
             "questionButtonCount": 0
           },
           "medium": {
-            "height": 150,
+            "height": 162,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1858,16 +1858,16 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 349,
-                "maxY": 116
+                "maxY": 128
               },
-              "textMaxY": 48,
+              "textMaxY": 42,
               "scrollHostActive": true
             },
             "state": "pinned",
             "questionButtonCount": 0
           },
           "long": {
-            "height": 150,
+            "height": 162,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1875,7 +1875,7 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 349,
-                "maxY": 116
+                "maxY": 128
               },
               "textMaxY": 55,
               "scrollHostActive": true
@@ -1884,7 +1884,7 @@
             "questionButtonCount": 0
           },
           "multiline": {
-            "height": 150,
+            "height": 162,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1892,7 +1892,7 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 349,
-                "maxY": 116
+                "maxY": 128
               },
               "textMaxY": 55,
               "scrollHostActive": true
@@ -1901,7 +1901,7 @@
             "questionButtonCount": 0
           },
           "long-pending": {
-            "height": 151,
+            "height": 163,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1909,7 +1909,7 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 397,
-                "maxY": 136
+                "maxY": 156
               },
               "textMaxY": 85,
               "scrollHostActive": true
@@ -1918,7 +1918,7 @@
             "questionButtonCount": 0
           },
           "long-options": {
-            "height": 152,
+            "height": 164,
             "containment": {
               "ok": true,
               "frameCount": 8,
@@ -1926,7 +1926,7 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 397,
-                "maxY": 166
+                "maxY": 186
               },
               "textMaxY": 85,
               "scrollHostActive": true
@@ -1939,8 +1939,8 @@
           "baselineAnim": 6,
           "afterAnim": 6,
           "state": "pinned",
-          "baselineH": 158,
-          "afterH": 158
+          "baselineH": 170,
+          "afterH": 170
         }
       }
     },
@@ -1962,15 +1962,15 @@
       "details": {
         "pathBounds": {
           "y": 0,
-          "x": 25.52,
-          "width": 297.96000000000004,
-          "height": 150
+          "x": 0,
+          "width": 349,
+          "height": 162
         },
         "contentViewport": {
           "y": 25,
           "x": 0,
           "width": 349,
-          "height": 48
+          "height": 40
         },
         "shapeAwareHitTesting": true,
         "pathTopologyCompatible": true
@@ -1986,13 +1986,13 @@
           "y": 25,
           "x": 0,
           "width": 349,
-          "height": 48
+          "height": 40
         },
         "contentSafeViewport": {
           "y": 25,
-          "x": 33.519999999999996,
-          "width": 281.96000000000004,
-          "height": 48
+          "x": 46.4,
+          "width": 256.2,
+          "height": 40
         },
         "state": "interactive"
       }
@@ -2002,18 +2002,18 @@
       "ok": true,
       "details": {
         "compactWidth": 313,
-        "shortHeight": 150,
+        "shortHeight": 162,
         "shortWidth": 349,
         "approvalWidth": 397,
         "questionWidth": 397,
-        "longHeight": 158,
+        "longHeight": 170,
         "longScroll": true,
         "pad": 28,
         "contentSafeViewport": {
           "y": 25,
-          "x": 33.519999999999996,
-          "width": 281.96000000000004,
-          "height": 48
+          "x": 46.4,
+          "width": 256.2,
+          "height": 40
         }
       }
     },
@@ -2035,7 +2035,7 @@
       "details": {
         "constants": {
           "EXPANDED_HEIGHT_MIN": 72,
-          "EXPANDED_HEIGHT_MAX": 200,
+          "EXPANDED_HEIGHT_MAX": 220,
           "EXPANDED_WIDTH_PAD": 28,
           "STABLE_WING": 64
         },
@@ -2043,23 +2043,23 @@
           "contentPopulated": true,
           "overlap": {
             "skipped": false,
-            "scrollBottom": 84,
-            "approveY": 92
+            "scrollBottom": 76,
+            "approveY": 84
           },
           "approveButtonFrame": {
-            "y": 92,
-            "x": 176.94,
-            "width": 184.12,
+            "y": 84,
+            "x": 179,
+            "width": 170,
             "height": 28
           },
           "pendingMessageFrame": {
             "y": 22,
-            "x": 35.94,
-            "width": 353,
+            "x": 48,
+            "width": 301,
             "height": 28
           },
           "composerFrame": null,
-          "height": 161
+          "height": 173
         },
         "question3": {
           "contentPopulated": true,
@@ -2080,20 +2080,20 @@
           "optionButtonFrames": [
             {
               "y": 99,
-              "x": 40,
-              "width": 155,
+              "x": 48,
+              "width": 147,
               "height": 28
             },
             {
               "y": 99,
               "x": 201,
-              "width": 156,
+              "width": 148,
               "height": 28
             },
             {
               "y": 131,
-              "x": 40,
-              "width": 317,
+              "x": 48,
+              "width": 301,
               "height": 28
             }
           ]
@@ -2106,8 +2106,8 @@
               2,
               2
             ],
-            "optionTop": 79,
-            "optionBottom": 139,
+            "optionTop": 71,
+            "optionBottom": 131,
             "count": 4
           }
         }
@@ -2118,32 +2118,32 @@
       "ok": true,
       "details": {
         "silhouetteMetrics": {
-          "topLeftX": 25.52,
-          "topRightX": 323.48,
-          "bodyDepth": 116,
-          "shoulderFlare": 25.52,
-          "contentSafeInsetX": 33.519999999999996,
-          "effShoulderR": 25.52,
+          "topLeftX": 38.4,
+          "topRightX": 310.6,
+          "bodyDepth": 128,
+          "shoulderFlare": 38.4,
+          "contentSafeInsetX": 46.4,
+          "effShoulderR": 38.4,
           "notchCenter": 174.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 25.52,
+          "cachedEffShoulderR": 38.4,
           "panelWidth": 349,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 25.52,
+          "opticalTopInset": 38.4,
           "tangentContinuity": true
         },
         "shapeMaskSynced": true,
         "frame": {
           "x": 581,
-          "y": 832,
+          "y": 820,
           "width": 349,
-          "height": 150,
+          "height": 162,
           "isActual": true,
           "requested": {
             "x": 581,
-            "y": 832,
+            "y": 820,
             "width": 349,
-            "height": 150
+            "height": 162
           }
         }
       }
@@ -2156,16 +2156,16 @@
           "y": 25,
           "x": 0,
           "width": 349,
-          "height": 48
+          "height": 40
         },
         "contentScrollFrame": {
           "y": 25,
           "x": 0,
           "width": 349,
-          "height": 48
+          "height": 40
         },
         "contentFooterGutter": 8,
-        "footerTopY": 81
+        "footerTopY": 73
       }
     },
     {
@@ -2209,15 +2209,15 @@
       "details": {
         "overlap": {
           "skipped": false,
-          "scrollBottom": 84,
-          "approveY": 92
+          "scrollBottom": 89,
+          "approveY": 97
         },
         "approveGutter": {
           "skipped": false,
           "gutter": 8,
           "declared": 8,
-          "scrollBottom": 84,
-          "controlY": 92
+          "scrollBottom": 89,
+          "controlY": 97
         },
         "contentFooterGutter": 8
       }
@@ -2234,12 +2234,12 @@
             2,
             1
           ],
-          "optionTop": 92,
-          "optionBottom": 152,
+          "optionTop": 84,
+          "optionBottom": 144,
           "count": 3
         },
-        "optionTop": 92,
-        "scrollBottom": 84
+        "optionTop": 84,
+        "scrollBottom": 76
       }
     },
     {
@@ -2253,31 +2253,31 @@
           "scrollOffset": 0,
           "optionButtonCount": 4,
           "panelFrame": {
-            "y": 789,
+            "y": 777,
             "x": 557,
             "width": 397,
-            "height": 193
+            "height": 205
           },
           "requestedFrame": {
-            "y": 789,
+            "y": 777,
             "x": 557,
             "width": 397,
-            "height": 193
+            "height": 205
           }
         },
         "approvalDiag": {
           "pendingContentFullyVisible": true,
           "pendingMessageFullyVisible": true,
           "approveButtonFrame": {
-            "y": 79,
-            "x": 176.07999999999998,
-            "width": 187.84000000000003,
+            "y": 84,
+            "x": 179,
+            "width": 170,
             "height": 28
           },
           "denyButtonFrame": {
-            "y": 79,
-            "x": 33.08,
-            "width": 135,
+            "y": 84,
+            "x": 48,
+            "width": 123,
             "height": 28
           }
         }
@@ -2336,21 +2336,21 @@
       "details": {
         "long": {
           "panelFrame": {
-            "y": 782,
+            "y": 762,
             "x": 581,
             "width": 349,
-            "height": 200
+            "height": 220
           },
-          "pinnedInteractiveHeight": 200
+          "pinnedInteractiveHeight": 220
         },
         "short": {
           "panelFrame": {
-            "y": 832,
+            "y": 820,
             "x": 581,
             "width": 349,
-            "height": 150
+            "height": 162
           },
-          "pinnedInteractiveHeight": 150
+          "pinnedInteractiveHeight": 162
         }
       }
     },
@@ -2360,10 +2360,10 @@
       "details": {
         "question": {
           "panelFrame": {
-            "y": 802,
+            "y": 790,
             "x": 557,
             "width": 397,
-            "height": 180
+            "height": 192
           }
         },
         "completed": {
@@ -2377,50 +2377,49 @@
         },
         "approval": {
           "panelFrame": {
-            "y": 834,
+            "y": 822,
             "x": 557,
             "width": 397,
-            "height": 148
+            "height": 160
           },
           "composerVisible": false
         },
         "working": {
           "panelFrame": {
-            "y": 832,
+            "y": 820,
             "x": 581,
             "width": 349,
-            "height": 150
+            "height": 162
           }
         }
       }
     },
     {
       "name": "empty-space-budget-and-content-density",
-      "ok": false,
+      "ok": true,
       "details": {
         "shortWorking": {
           "panelFrame": {
-            "y": 832,
+            "y": 820,
             "x": 581,
             "width": 349,
-            "height": 150
+            "height": 162
           },
           "activityFrame": {
             "y": 2,
-            "x": 33.519999999999996,
-            "width": 305,
+            "x": 46.4,
+            "width": 256.2,
             "height": 15
           },
           "composerFrame": {
-            "y": 81,
-            "x": 33.519999999999996,
-            "width": 213.96000000000004,
+            "y": 73,
+            "x": 46.4,
+            "width": 188.2,
             "height": 28
           }
         },
-        "shortWorkingGap": 39
-      },
-      "error": "empty space void between content and composer too large: 39pt (expected <= 28pt)"
+        "shortWorkingGap": 31
+      }
     },
     {
       "name": "environment-transition-and-hover-suppression",
@@ -2445,9 +2444,76 @@
     },
     {
       "name": "systematic-semantic-transition-matrix-and-invalidation",
-      "ok": false,
-      "details": {},
-      "error": "working-short: height 150 > max expected 125"
+      "ok": true,
+      "details": {
+        "steps": [
+          {
+            "desc": "working-long",
+            "height": 211,
+            "kind": ""
+          },
+          {
+            "desc": "working-short",
+            "height": 162,
+            "kind": ""
+          },
+          {
+            "desc": "working-to-completed",
+            "height": 86,
+            "kind": ""
+          },
+          {
+            "desc": "completed-to-working",
+            "height": 162,
+            "kind": ""
+          },
+          {
+            "desc": "working-to-question-2-opts",
+            "height": 142,
+            "kind": "question"
+          },
+          {
+            "desc": "question-4-opts-expand",
+            "height": 174,
+            "kind": "question"
+          },
+          {
+            "desc": "question-to-completed",
+            "height": 86,
+            "kind": ""
+          },
+          {
+            "desc": "completed-to-working-2",
+            "height": 162,
+            "kind": ""
+          },
+          {
+            "desc": "working-to-approval",
+            "height": 160,
+            "kind": "approval"
+          },
+          {
+            "desc": "approval-to-failed",
+            "height": 86,
+            "kind": ""
+          },
+          {
+            "desc": "failed-to-working",
+            "height": 162,
+            "kind": ""
+          },
+          {
+            "desc": "working-to-approval-2",
+            "height": 142,
+            "kind": "approval"
+          },
+          {
+            "desc": "approval-to-question-direct",
+            "height": 142,
+            "kind": "question"
+          }
+        ]
+      }
     },
     {
       "name": "streaming-text-stability-vs-semantic-invalidation",
@@ -2475,22 +2541,22 @@
           "pinVisible": false,
           "openVisible": false,
           "approveFrame": {
-            "y": 79,
-            "x": 176.07999999999998,
-            "width": 187.84000000000003,
+            "y": 71,
+            "x": 177.8,
+            "width": 173.39999999999998,
             "height": 28
           },
           "denyFrame": {
-            "y": 79,
-            "x": 33.08,
-            "width": 135,
+            "y": 71,
+            "x": 45.8,
+            "width": 124,
             "height": 28
           },
           "panelFrame": {
-            "y": 834,
+            "y": 822,
             "x": 557,
             "width": 397,
-            "height": 148
+            "height": 160
           }
         },
         "completed": {
@@ -2537,21 +2603,21 @@
       "ok": true,
       "details": {
         "panelFrame": {
-          "y": 806,
+          "y": 794,
           "x": 581,
           "width": 349,
-          "height": 176
+          "height": 188
         },
         "bodyBounds": {
           "y": 0,
           "x": 0,
           "width": 349,
-          "height": 142
+          "height": 154
         },
         "activityFrame": {
           "y": 2,
-          "x": 39.239999999999995,
-          "width": 305,
+          "x": 48,
+          "width": 253,
           "height": 28
         },
         "containmentOk": true
@@ -2565,10 +2631,10 @@
         "composerVisible": true,
         "approvalVisible": false,
         "panelFrame": {
-          "y": 832,
+          "y": 820,
           "x": 581,
           "width": 349,
-          "height": 150
+          "height": 162
         }
       }
     },
@@ -2578,15 +2644,15 @@
       "details": {
         "panelW": 397,
         "denyFrame": {
-          "y": 79,
-          "x": 33.08,
-          "width": 135,
+          "y": 71,
+          "x": 45.8,
+          "width": 124,
           "height": 28
         },
         "approveFrame": {
-          "y": 79,
-          "x": 176.07999999999998,
-          "width": 187.84000000000003,
+          "y": 71,
+          "x": 177.8,
+          "width": 173.39999999999998,
           "height": 28
         },
         "composerVisible": false,
@@ -2653,16 +2719,16 @@
       "details": {
         "diag": {
           "panelFrame": {
-            "y": 788,
+            "y": 776,
             "x": 581,
             "width": 349,
-            "height": 194
+            "height": 206
           },
           "contentScrollFrame": {
             "y": 25,
             "x": 0,
             "width": 349,
-            "height": 92
+            "height": 84
           },
           "notchDetected": true,
           "canonicalState": "interactiveWorking"
@@ -2689,10 +2755,10 @@
           "canonicalState": "interactiveWorking",
           "transitionInFlight": false,
           "panelFrame": {
-            "y": 832,
+            "y": 820,
             "x": 581,
             "width": 349,
-            "height": 150
+            "height": 162
           },
           "composerVisible": true,
           "approvalControlsVisible": false
@@ -2758,16 +2824,16 @@
       "details": {
         "diag": {
           "panelFrame": {
-            "y": 812,
+            "y": 792,
             "x": 557,
             "width": 397,
-            "height": 170
+            "height": 190
           },
           "bodyBounds": {
             "y": 0,
             "x": 0,
             "width": 397,
-            "height": 136
+            "height": 156
           },
           "contentScrollFrame": {
             "y": 25,
@@ -2777,8 +2843,8 @@
           },
           "contentSafeViewport": {
             "y": 25,
-            "x": 37.92,
-            "width": 321.15999999999997,
+            "x": 48,
+            "width": 301,
             "height": 68
           },
           "contentDocumentHeight": 85,
@@ -2814,28 +2880,28 @@
       "ok": true,
       "details": {
         "panelFrame": {
-          "y": 824,
+          "y": 812,
           "x": 581,
           "width": 349,
-          "height": 158
+          "height": 170
         },
         "bodyBounds": {
           "y": 0,
           "x": 0,
           "width": 349,
-          "height": 124
+          "height": 136
         },
         "contentScrollFrame": {
           "y": 25,
           "x": 0,
           "width": 349,
-          "height": 56
+          "height": 48
         },
         "contentSafeViewport": {
           "y": 25,
-          "x": 35.28,
-          "width": 278.44,
-          "height": 56
+          "x": 48,
+          "width": 253,
+          "height": 48
         }
       }
     },
@@ -2875,22 +2941,22 @@
       "details": {
         "approval": {
           "approveFrame": {
-            "y": 61,
-            "x": 175.12,
-            "width": 192.76,
+            "y": 53,
+            "x": 177.4,
+            "width": 179.2,
             "height": 28
           },
           "denyFrame": {
-            "y": 61,
-            "x": 29.12,
-            "width": 138,
+            "y": 53,
+            "x": 40.4,
+            "width": 129,
             "height": 28
           },
           "panelFrame": {
-            "y": 852,
+            "y": 840,
             "x": 557,
             "width": 397,
-            "height": 130
+            "height": 142
           }
         }
       }
@@ -2901,27 +2967,27 @@
       "details": {
         "diag": {
           "panelFrame": {
-            "y": 832,
+            "y": 820,
             "x": 581,
             "width": 349,
-            "height": 150
+            "height": 162
           },
           "safeAreaTop": 32,
           "screenTopY": 982,
           "topAnchorDelta": 0,
           "shoulderMetrics": {
-            "topLeftX": 25.52,
-            "topRightX": 323.48,
-            "bodyDepth": 116,
-            "shoulderFlare": 25.52,
-            "contentSafeInsetX": 33.519999999999996,
-            "effShoulderR": 25.52,
+            "topLeftX": 38.4,
+            "topRightX": 310.6,
+            "bodyDepth": 128,
+            "shoulderFlare": 38.4,
+            "contentSafeInsetX": 46.4,
+            "effShoulderR": 38.4,
             "notchCenter": 174.5,
             "nonDegenerateShoulder": true,
-            "cachedEffShoulderR": 25.52,
+            "cachedEffShoulderR": 38.4,
             "panelWidth": 349,
             "shoulderCurvatureContinuous": true,
-            "opticalTopInset": 25.52,
+            "opticalTopInset": 38.4,
             "tangentContinuity": true
           }
         }
@@ -2929,13 +2995,13 @@
     },
     {
       "name": "adversarial-word-wrap-and-unbroken-containment",
-      "ok": false,
+      "ok": true,
       "details": {
         "natural": {
           "activityFrame": {
             "y": 2,
-            "x": 35.28,
-            "width": 305,
+            "x": 48,
+            "width": 253,
             "height": 28
           },
           "activityLabel": "Validating natural sentence line breaking without splitting words awkwardly across boundaries."
@@ -2943,47 +3009,53 @@
         "unbroken": {
           "activityFrame": {
             "y": 2,
-            "x": 35.28,
-            "width": 305,
+            "x": 48,
+            "width": 253,
             "height": 28
           },
           "panelFrame": {
-            "y": 824,
+            "y": 812,
             "x": 581,
             "width": 349,
-            "height": 158
+            "height": 170
           }
         }
-      },
-      "error": "Unbroken token right edge (340.28) escaped panel boundary (331)"
+      }
     },
     {
       "name": "working-state-hierarchy-and-empty-space-budget",
-      "ok": false,
+      "ok": true,
       "details": {
         "shortWorking": {
           "panelFrame": {
-            "y": 832,
+            "y": 820,
             "x": 581,
             "width": 349,
-            "height": 150
+            "height": 162
           },
           "activityFrame": {
             "y": 2,
-            "x": 33.519999999999996,
-            "width": 305,
+            "x": 46.4,
+            "width": 256.2,
             "height": 15
           },
           "composerFrame": {
-            "y": 81,
-            "x": 33.519999999999996,
-            "width": 213.96000000000004,
+            "y": 73,
+            "x": 46.4,
+            "width": 188.2,
             "height": 28
           }
         },
-        "gap": 39
-      },
-      "error": "Empty space gap between activity and composer (39pt) exceeds 20pt budget"
+        "gap": 31,
+        "rawIdHandling": {
+          "activityLabel": "Activity 1629",
+          "renderedActivityText": "Validating graph layout constraints"
+        },
+        "rawIdWithoutMessage": {
+          "activityLabel": "Activity 1629",
+          "renderedActivityText": "Working with Magnus"
+        }
+      }
     },
     {
       "name": "terminal-states-tight-bounding-and-build-provenance",
@@ -3008,18 +3080,13 @@
           "state": "terminalFailed"
         },
         "provenance": {
-          "buildTimestamp": "Sep  8 2026 14:29:41",
+          "buildTimestamp": "Sep  8 2026 22:37:35",
           "buildSourceFile": "../src/live_activity.mm",
-          "buildFingerprint": "native-vSep  8 2026-14:29:41"
+          "buildFingerprint": "native-vSep  8 2026-22:37:35"
         }
       }
     }
   ],
-  "failures": [
-    "empty-space-budget-and-content-density: empty space void between content and composer too large: 39pt (expected <= 28pt)",
-    "systematic-semantic-transition-matrix-and-invalidation: working-short: height 150 > max expected 125",
-    "adversarial-word-wrap-and-unbroken-containment: Unbroken token right edge (340.28) escaped panel boundary (331)",
-    "working-state-hierarchy-and-empty-space-budget: Empty space gap between activity and composer (39pt) exceeds 20pt budget"
-  ],
-  "ok": false
+  "failures": [],
+  "ok": true
 }

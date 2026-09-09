@@ -1067,11 +1067,11 @@ const projectTemporalVisibleSet = ${serializeTemporalProjectionSource()};
 const pending = new Map();
 function request(type, payload, timeoutMs = 5000) {
 	const requestId = Math.random().toString(36).slice(2);
-	return new Promise(function (resolve, reject) {
+	return new Promise(function (resolve) {
 		const timer = setTimeout(function () {
 			if (pending.has(requestId)) {
 				pending.delete(requestId);
-				reject(new Error('Request timed out: ' + type));
+				resolve(undefined);
 			}
 		}, timeoutMs);
 		pending.set(requestId, function (val) {
@@ -3050,12 +3050,12 @@ function drawTemporalFrame(ts) {
 				}
 			}
 			recordProjectedUtilization(metrics, screenPoints, w, h);
-			if (window.__prebaseRecordRenderMetrics) {
-				try {
-					document.documentElement.dataset.prebaseGraphMetrics = JSON.stringify(metrics);
-				} catch {}
-			}
-		} catch {}
+		if (window.__prebaseRecordRenderMetrics) {
+			try {
+				document.documentElement.dataset.prebaseGraphMetrics = JSON.stringify(metrics);
+			} catch (e) { console.debug('[PreBase Graph] Failed to record render metrics:', e); }
+		}
+	} catch (e) { console.debug('[PreBase Graph] Render metrics collection failed:', e); }
 	}
 
 	ctx.restore();
@@ -3559,7 +3559,7 @@ function render(first) {
 	try {
 		document.documentElement.dataset.prebaseGraphMode = graphType || 'network';
 		document.documentElement.dataset.prebaseGraphDisplayMode = displayMode || '';
-	} catch {}
+	} catch (e) { console.debug('[PreBase Graph] Failed to update graph display dataset:', e); }
 
 	if (isTemporal()) {
 		if (archSvg) archSvg.style.display = 'none';
@@ -3874,7 +3874,7 @@ function onPointerDown(e, host) {
 				const metrics = window.__prebaseGraphRenderMetrics || (window.__prebaseGraphRenderMetrics = {});
 				metrics.pointerCaptureHost = host.id || '';
 				metrics.pointerCaptureActive = captureConfirmed;
-			} catch {}
+			} catch (e) { console.debug('[PreBase Graph] Failed to record pointer capture metrics:', e); }
 		}
 		host.classList.add('dragging');
 	}
@@ -3936,7 +3936,7 @@ function onPointerUp(e, terminationReason) {
 			metrics.pointerCaptureActive = false;
 			metrics.pointerCaptureHeld = captureStillHeld;
 			metrics.lastGestureTerminationReason = terminationReason || '';
-		} catch {}
+		} catch (e) { console.debug('[PreBase Graph] Failed to record gesture termination metrics:', e); }
 	}
 	const wasAborted = terminationReason && terminationReason !== 'pointerup';
 	const wasMoved = moved || wasAborted;
@@ -4556,11 +4556,7 @@ if (window.matchMedia) {
 	try {
 		const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 		const motionListener = function () { dirty = true; kickRaf(); };
-		if (typeof motionQuery.addEventListener === 'function') {
-			motionQuery.addEventListener('change', motionListener);
-		} else if (typeof motionQuery.addListener === 'function') {
-			motionQuery.addListener(motionListener);
-		}
+		motionQuery.addEventListener('change', motionListener);
 	} catch (err) { /* older matchMedia implementations */ }
 }
 
@@ -4829,21 +4825,36 @@ request('getSnapshot').then(function (res) {
 setTimeout(function () {
 	if (!snapshot && (!temporalState || !temporalDiff)) {
 		if (empty && empty.textContent === 'Preparing graph…') {
-			empty.innerHTML = '<div style="padding:16px;"><div>Graph renderer failed to initialize.</div><button id="retryWatchdogBtn" style="margin-top:10px; padding:4px 12px; border-radius:4px; background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); border:none; cursor:pointer; font-weight:600;">Retry</button></div>';
-			const btn = document.getElementById('retryWatchdogBtn');
-			if (btn) {
-				btn.onclick = function () {
-					empty.textContent = 'Preparing graph…';
-					request('ready', { generation: currentGeneration, graphType: initialGraphType });
-					request('getSnapshot').then(function (res) {
-						if (!res) return;
-						snapshot = res.snapshot;
-						diagnostics = res.diagnostics;
-						if (res.graphType) graphType = res.graphType;
-						render(true);
-					});
-				};
-			}
+			empty.textContent = '';
+			const wrapper = document.createElement('div');
+			wrapper.style.padding = '16px';
+			const msg = document.createElement('div');
+			msg.textContent = 'Graph renderer failed to initialize.';
+			wrapper.appendChild(msg);
+			const btn = document.createElement('button');
+			btn.id = 'retryWatchdogBtn';
+			btn.textContent = 'Retry';
+			btn.style.marginTop = '10px';
+			btn.style.padding = '4px 12px';
+			btn.style.borderRadius = '4px';
+			btn.style.background = 'var(--vscode-button-background, #2dd4bf)';
+			btn.style.color = 'var(--vscode-button-foreground, #1B1C1E)';
+			btn.style.border = 'none';
+			btn.style.cursor = 'pointer';
+			btn.style.fontWeight = '600';
+			wrapper.appendChild(btn);
+			empty.appendChild(wrapper);
+			btn.onclick = function () {
+				empty.textContent = 'Preparing graph…';
+				request('ready', { generation: currentGeneration, graphType: initialGraphType });
+				request('getSnapshot').then(function (res) {
+					if (!res) return;
+					snapshot = res.snapshot;
+					diagnostics = res.diagnostics;
+					if (res.graphType) graphType = res.graphType;
+					render(true);
+				}).catch(function () { /* retry failed */ });
+			};
 		}
 	}
 }, 4000);

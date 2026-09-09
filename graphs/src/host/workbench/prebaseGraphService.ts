@@ -195,7 +195,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		}
 		this._debounceRescanTimer = setTimeout(() => {
 			this._debounceRescanTimer = undefined;
-			void this.rescanWorkspace();
+			void this.rescanWorkspace().catch(() => { /* rescan failed */ });
 		}, 500);
 	}
 

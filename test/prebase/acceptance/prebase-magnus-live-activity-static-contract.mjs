@@ -214,7 +214,7 @@ if (!native.includes('emit:@"dismissAttention"')) {
 		}
 		// Geometry constants: height max upgraded to 200, width legacy alias preserved
 		if (!/kExpandedHeightMin = 72/.test(native)
-			|| !/kExpandedHeightMax = 200/.test(native)
+			|| !/kExpandedHeightMax = 220/.test(native)
 			|| !/kExpandedWidthPad = 28/.test(native)
 			|| !/kExpandedWidthStandardPad = 36/.test(native)
 			|| !/kExpandedWidthWidePad = 84/.test(native)
@@ -224,7 +224,7 @@ if (!native.includes('emit:@"dismissAttention"')) {
 			failures.push('native geometry constants must be: min=72 max=200 widthPad=28(alias) standardPad=36 widePad=84 minScroll=40 wings=64');
 		}
 		if (!/LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 72/.test(magnusCommon)
-			|| !/LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 200/.test(magnusCommon)
+			|| !/LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 220/.test(magnusCommon)
 			|| !/LIVE_ACTIVITY_EXPANDED_WIDTH_PAD = 28/.test(magnusCommon)
 			|| !/LIVE_ACTIVITY_WING_WIDTH_DEFAULT = 64/.test(magnusCommon)) {
 			failures.push('TS magnusLiveActivity geometry constants must stay aligned with native (72/200/28/64)');
@@ -238,9 +238,9 @@ if (!native.includes('emit:@"dismissAttention"')) {
 		}
 		{
 			const stackFnStart = native.indexOf('- (CGFloat)computeControlsStackHeight {');
-			const stackFn = stackFnStart >= 0 ? native.slice(stackFnStart, stackFnStart + 900) : '';
+			const stackFn = stackFnStart >= 0 ? native.slice(stackFnStart, stackFnStart + 1400) : '';
 			if (!/Must match layoutControls/.test(stackFn)
-				|| !/kControlHeight \+ 7/.test(stackFn)
+				|| !/kControlHeight \+ kBottomCornerRadius \+ 5/.test(stackFn)
 				|| !/perRow = \(maxDirect >= 3\) \? 2/.test(stackFn)) {
 				failures.push('computeControlsStackHeight must match layoutControls (composer + approval + 2-col option rows)');
 			}

@@ -272,14 +272,16 @@ export class WebClientServer {
 			// We got a connection token as a query parameter.
 			// We want to have a clean URL, so we strip it
 			const responseHeaders: Record<string, string> = Object.create(null);
-			responseHeaders['Set-Cookie'] = cookie.serialize(
-				connectionTokenCookieName,
-				queryConnectionToken,
-				{
-					sameSite: 'lax',
-					maxAge: 60 * 60 * 24 * 7 /* 1 week */
-				}
-			);
+		responseHeaders['Set-Cookie'] = cookie.serialize(
+			connectionTokenCookieName,
+			queryConnectionToken,
+			{
+				sameSite: 'lax',
+				httpOnly: true,
+				secure: true,
+				maxAge: 60 * 60 * 24 * 7 /* 1 week */
+			}
+		);
 
 			const newQuery = Object.create(null);
 			for (const key in parsedUrl.query) {
@@ -455,14 +457,16 @@ export class WebClientServer {
 			// At this point we know the client has a valid cookie
 			// and we want to set it prolong it to ensure that this
 			// client is valid for another 1 week at least
-			headers['Set-Cookie'] = cookie.serialize(
-				connectionTokenCookieName,
-				this._connectionToken.value,
-				{
-					sameSite: 'lax',
-					maxAge: 60 * 60 * 24 * 7 /* 1 week */
-				}
-			);
+		headers['Set-Cookie'] = cookie.serialize(
+			connectionTokenCookieName,
+			this._connectionToken.value,
+			{
+				sameSite: 'lax',
+				httpOnly: true,
+				secure: true,
+				maxAge: 60 * 60 * 24 * 7 /* 1 week */
+			}
+		);
 		}
 
 		res.writeHead(200, headers);

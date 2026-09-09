@@ -77,7 +77,7 @@ async function update() {
 	if (modulesWithVersion.length > 0) {
 		for (const cwd of [vscodeDir, path.join(vscodeDir, 'remote'), path.join(vscodeDir, 'remote/web')]) {
 			console.log(`${path.join(cwd, 'package.json')}: Updating\n  ${modulesWithVersion.join('\n  ')}`);
-			cp.execSync(`npm install ${modulesWithVersion.join(' ')}`, { cwd });
+			cp.execFileSync('npm', ['install', ...modulesWithVersion], { cwd });
 		}
 	}
 
@@ -93,7 +93,7 @@ async function update() {
 	if (backendOnlyModulesWithVersion.length > 0) {
 		for (const cwd of [vscodeDir, path.join(vscodeDir, 'remote')]) {
 			console.log(`${path.join(cwd, 'package.json')}: Updating\n  ${backendOnlyModulesWithVersion.join('\n  ')}`);
-			cp.execSync(`npm install ${backendOnlyModulesWithVersion.join(' ')}`, { cwd });
+			cp.execFileSync('npm', ['install', ...backendOnlyModulesWithVersion], { cwd });
 		}
 	}
 }

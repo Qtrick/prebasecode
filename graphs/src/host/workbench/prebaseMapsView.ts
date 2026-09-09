@@ -723,7 +723,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		// Phase 2: Debounced full repository history search across git
 		this._searchDebounceTimer = setTimeout(() => {
-			void this._performBackendCommitSearch(query);
+			void this._performBackendCommitSearch(query).catch(() => { /* backend search failed */ });
 		}, 250);
 	}
 

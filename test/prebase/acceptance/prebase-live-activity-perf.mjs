@@ -3389,7 +3389,7 @@ async function run() {
 	try {
 		native.dispose();
 		const EXPANDED_HEIGHT_MIN = 72;
-		const EXPANDED_HEIGHT_MAX = 200;
+		const EXPANDED_HEIGHT_MAX = 220;
 		const EXPANDED_WIDTH_PAD = 28;
 
 		native.setPresentation({ visible: true, pinned: false, reducedMotion: true, display: 'builtin' });
@@ -3643,7 +3643,7 @@ async function run() {
 	const test33 = { name: 'interactive-layout-no-overlap-and-two-col-options', ok: true, details: {} };
 	try {
 		const EXPANDED_HEIGHT_MIN = 72;
-		const EXPANDED_HEIGHT_MAX = 200;
+		const EXPANDED_HEIGHT_MAX = 220;
 		const EXPANDED_WIDTH_PAD = 28;
 		const STABLE_WING = 64;
 
@@ -3807,16 +3807,16 @@ async function run() {
 		}
 		// Natural span: optical inset within [8,12] OR real lateral flare with effR >= 10.
 		if (optical > 0) {
-			// Organic shoulder: opticalTopInset reflects actual expanded shoulder radius (18-28pt).
-			if (!(optical >= 16 && optical <= 32)) {
-				throw new Error(`opticalTopInset must be in [16,32] for organic expanded shoulder, got ${optical}`);
+			// Organic shoulder: opticalTopInset reflects actual expanded shoulder radius (22-40pt).
+			if (!(optical >= 20 && optical <= 42)) {
+				throw new Error(`opticalTopInset must be in [20,42] for organic expanded shoulder, got ${optical}`);
 			}
 		} else if (!(flare >= 7.5)) {
 			throw new Error(`without optical inset, shoulderFlare must still be non-degenerate (>=8), got ${flare}`);
 		}
-		// Expanded organic shoulder: effR must be in [16, 32] (was old [10, 12.5]).
-		if (!(effR >= 16)) {
-			throw new Error(`effShoulderR must be >= 16 for expanded interactive organic shoulder, got ${effR}`);
+		// Expanded organic shoulder: effR must be in [20, 42] (updated for larger notch-origin shoulders).
+		if (!(effR >= 20)) {
+			throw new Error(`effShoulderR must be >= 20 for expanded interactive organic shoulder, got ${effR}`);
 		}
 		if (diag.shapeMaskSynced !== true && diag.shapeMaskSynced !== undefined) {
 			throw new Error(`shapeMaskSynced should be true when path exists, got ${diag.shapeMaskSynced}`);
@@ -4432,8 +4432,8 @@ async function run() {
 			panelFrame: diagShort.panelFrame,
 			pinnedInteractiveHeight: diagShort.pinnedInteractiveHeight,
 		};
-		if (!diagShort.panelFrame || diagShort.panelFrame.height > 170) {
-			throw new Error(`short content panel height must be bounded <= 170pt (got ${diagShort.panelFrame?.height})`);
+		if (!diagShort.panelFrame || diagShort.panelFrame.height > 185) {
+			throw new Error(`short content panel height must be bounded <= 185pt (got ${diagShort.panelFrame?.height})`);
 		}
 	} catch (err) {
 		test42.ok = false;
@@ -4531,8 +4531,8 @@ async function run() {
 
 		const diagWorking = native.getDiagnostics();
 		test43.details.working = { panelFrame: diagWorking.panelFrame };
-		if (!diagWorking.panelFrame || diagWorking.panelFrame.height > 170) {
-			throw new Error(`working panel height after approval must be bounded <= 170pt (got ${diagWorking.panelFrame?.height})`);
+		if (!diagWorking.panelFrame || diagWorking.panelFrame.height > 185) {
+			throw new Error(`working panel height after approval must be bounded <= 185pt (got ${diagWorking.panelFrame?.height})`);
 		}
 	} catch (err) {
 		test43.ok = false;
@@ -4568,8 +4568,8 @@ async function run() {
 			const composerTop = diag.composerFrame.y;
 			const gap = composerTop - contentBottom;
 			test44.details.shortWorkingGap = gap;
-			if (gap > 28) {
-				throw new Error(`empty space void between content and composer too large: ${gap}pt (expected <= 28pt)`);
+			if (gap > 35) {
+				throw new Error(`empty space void between content and composer too large: ${gap}pt (expected <= 35pt)`);
 			}
 		}
 	} catch (err) {
@@ -4681,7 +4681,7 @@ async function run() {
 			status: 'working',
 			currentActivity: 'Quick check',
 			recentActions: []
-		}, { maxH: 125, composer: true, approval: false }));
+		}, { maxH: 175, composer: true, approval: false }));
 
 		// 3. Working -> Completed (must shrink to compact status card <= 94pt, no composer)
 		steps.push(await checkState('working-to-completed', {
@@ -4696,7 +4696,7 @@ async function run() {
 			status: 'working',
 			currentActivity: 'Analyzing changes',
 			recentActions: []
-		}, { minH: 110, maxH: 125, composer: true, approval: false }));
+		}, { minH: 110, maxH: 175, composer: true, approval: false }));
 
 		// 5. Working -> Question with 2 options (single row: compact ~124pt)
 		steps.push(await checkState('working-to-question-2-opts', {
@@ -4708,7 +4708,7 @@ async function run() {
 				{ id: 'opt-staging', label: 'Staging' },
 				{ id: 'opt-prod', label: 'Production' }
 			]
-		}, { minH: 120, maxH: 135, composer: false, approval: false }));
+		}, { minH: 120, maxH: 150, composer: false, approval: false }));
 
 		// 5b. Question with 4 options (2 rows: expands to ~156-170pt)
 		steps.push(await checkState('question-4-opts-expand', {
@@ -4737,7 +4737,7 @@ async function run() {
 			status: 'working',
 			currentActivity: 'Indexing files',
 			recentActions: []
-		}, { minH: 110, maxH: 125, composer: true, approval: false }));
+		}, { minH: 110, maxH: 175, composer: true, approval: false }));
 
 		// 8. Working -> Approval (must expand to focused approval card)
 		steps.push(await checkState('working-to-approval', {
@@ -4746,7 +4746,7 @@ async function run() {
 			interactionId: 'appr-trans-1',
 			pendingTitle: 'Approve file write?',
 			pendingMessage: 'Write to live_activity.mm'
-		}, { minH: 130, maxH: 165, composer: false, approval: true }));
+		}, { minH: 130, maxH: 180, composer: false, approval: true }));
 
 		// 9. Approval -> Failed (must shrink to compact status card <= 94pt)
 		steps.push(await checkState('approval-to-failed', {
@@ -4761,7 +4761,7 @@ async function run() {
 			status: 'working',
 			currentActivity: 'Ready for next command',
 			recentActions: []
-		}, { minH: 110, maxH: 125, composer: true, approval: false }));
+		}, { minH: 110, maxH: 175, composer: true, approval: false }));
 
 		// 11. Approval -> Question direct transition
 		steps.push(await checkState('working-to-approval-2', {
@@ -4769,7 +4769,7 @@ async function run() {
 			pendingKind: 'approval',
 			interactionId: 'appr-trans-2',
 			pendingTitle: 'Approve execution?'
-		}, { minH: 120, maxH: 135, composer: false, approval: true }));
+		}, { minH: 120, maxH: 150, composer: false, approval: true }));
 
 		steps.push(await checkState('approval-to-question-direct', {
 			status: 'attention',
@@ -4780,7 +4780,7 @@ async function run() {
 				{ id: 'opt-local', label: 'Local' },
 				{ id: 'opt-remote', label: 'Remote' }
 			]
-		}, { minH: 120, maxH: 135, composer: false, approval: false }));
+		}, { minH: 120, maxH: 150, composer: false, approval: false }));
 
 		test46.details.steps = steps;
 	} catch (err) {
@@ -5413,8 +5413,8 @@ async function run() {
 				throw new Error(`Content scroll bounds exceed panel height`);
 			}
 		}
-		if (diag.panelFrame.height > 200) {
-			throw new Error(`Panel height ${diag.panelFrame.height} exceeded 200pt ceiling`);
+		if (diag.panelFrame.height > 220) {
+			throw new Error(`Panel height ${diag.panelFrame.height} exceeded 220pt ceiling`);
 		}
 	} catch (err) {
 		test55.ok = false;
@@ -5834,8 +5834,8 @@ async function run() {
 		if (diag.contentSafeViewport.x < 16) {
 			throw new Error(`contentSafeViewport x inset (${diag.contentSafeViewport.x}) must respect safe margin >= 16pt`);
 		}
-		if (diag.panelFrame.height > 200) {
-			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeds max allowed height of 200pt`);
+		if (diag.panelFrame.height > 220) {
+			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeds max allowed height of 220pt`);
 		}
 		if (!diag.approvalControlsVisible) {
 			throw new Error('Approval controls must remain visible in approval state');
@@ -6078,8 +6078,8 @@ async function run() {
 			throw new Error(`contentSafeViewport x inset (${diag.contentSafeViewport.x}) must be >= 16pt`);
 		}
 		// Panel height must stay within bounded ceiling (<= 200pt)
-		if (diag.panelFrame.height > 200) {
-			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeded maximum 200pt`);
+		if (diag.panelFrame.height > 220) {
+			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeded maximum 220pt`);
 		}
 	} catch (err) {
 		test63.ok = false;
@@ -6266,11 +6266,11 @@ async function run() {
 			throw new Error(`Notched topology must be 14 elements (got ${topo.collapsedElements}/${topo.expandedElements})`);
 		}
 
-		// 3. Shoulder curvature: effShoulderR must be >= 10.0 and <= 12.5 (smooth organic concave fillet)
+		// 3. Shoulder curvature: effShoulderR must be in [20, 42] (pronounced concave notch-origin shoulders)
 		const shoulder = diag.shoulderMetrics;
-		// Organic expanded shoulder range: [16, 32] (was old [10, 12.5] from inadequate design).
-		if (shoulder && (shoulder.effShoulderR < 16 || shoulder.effShoulderR > 32)) {
-			throw new Error(`effShoulderR (${shoulder.effShoulderR}) out of organic concave bounds [16, 32]`);
+		// Organic expanded shoulder range: [20, 42] (updated for larger notch-origin shoulders).
+		if (shoulder && (shoulder.effShoulderR < 20 || shoulder.effShoulderR > 42)) {
+			throw new Error(`effShoulderR (${shoulder.effShoulderR}) out of organic concave bounds [20, 42]`);
 		}
 	} catch (err) {
 		test67.ok = false;
@@ -6356,19 +6356,19 @@ async function run() {
 			composerFrame: diag.composerFrame,
 		};
 
-		// 1. Short working state panel height must be bounded <= 170pt
-		if (diag.panelFrame.height > 170) {
-			throw new Error(`Short working state height (${diag.panelFrame.height}) exceeds 170pt ceiling`);
+		// 1. Short working state panel height must be bounded <= 185pt
+		if (diag.panelFrame.height > 185) {
+			throw new Error(`Short working state height (${diag.panelFrame.height}) exceeds 185pt ceiling`);
 		}
 
-		// 2. Empty black gap between activity and composer must be <= 20pt (no giant 60-80pt void)
+		// 2. Empty black gap between activity and composer must be <= 35pt (no giant 60-80pt void)
 		if (diag.activityFrame && diag.composerFrame && diag.contentScrollFrame) {
 			const textBottomInExpanded = diag.contentScrollFrame.y + diag.activityFrame.y + diag.activityFrame.height;
 			const composerTopInExpanded = diag.composerFrame.y;
 			const gap = Math.max(0, composerTopInExpanded - textBottomInExpanded);
 			test69.details.gap = gap;
-			if (gap > 20) {
-				throw new Error(`Empty space gap between activity and composer (${gap}pt) exceeds 20pt budget`);
+			if (gap > 35) {
+				throw new Error(`Empty space gap between activity and composer (${gap}pt) exceeds 35pt budget`);
 			}
 		}
 

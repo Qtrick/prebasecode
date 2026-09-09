@@ -247,8 +247,8 @@ assert.equal(medium, short, 'current activity is primary; latest message must no
 assert.ok(longH >= medium);
 assert.ok(longPending > longH || longPending > medium);
 assert.ok(longOptions > medium);
-assert.ok(short < 200 - 20, 'short working content must leave headroom below expanded max');
-assert.ok(longOptions <= 200);
+	assert.ok(short < 220 - 20, 'short working content must leave headroom below expanded max');
+	assert.ok(longOptions <= 220);
 `;
 
 	const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
@@ -273,7 +273,7 @@ import {
 } from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
 
 assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, 72);
-assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 200);
+assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 220);
 assert.equal(LIVE_ACTIVITY_EXPANDED_WIDTH_PAD, 28);
 assert.equal(LIVE_ACTIVITY_WING_WIDTH_DEFAULT, 64);
 assert.equal(LIVE_ACTIVITY_WING_WIDTH, 64);
@@ -293,7 +293,7 @@ assert.equal(computeLiveActivityWingWidth(200), 64);
 test('native source keeps natural expanded width + truthful Approve/Deny in-flight titles', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	assert.match(native, /kExpandedHeightMin = 72/);
-	assert.match(native, /kExpandedHeightMax = 200/);
+	assert.match(native, /kExpandedHeightMax = 220/);
 	assert.match(native, /kExpandedWidthPad = 28/);
 	assert.match(native, /kExpandedWidthStandardPad = 36/);
 	assert.match(native, /kExpandedWidthWidePad = 84/);
@@ -405,8 +405,8 @@ assert.ok(snap.recentActions.every(a => typeof a.label === 'string' && a.label.l
 test('native notch polish contracts: optical shoulder, true viewport, action id reconcile, footer gutter', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	assert.match(native, /kOpticalShoulderInsetMin = 8/);
-	// kOpticalShoulderInsetMax was removed in the 200pt redesign; shoulder radius is now fully dynamic in [18,32].
-	assert.match(native, /kExpandedShoulderRMax = 32/);
+	// kOpticalShoulderInsetMax was removed in the 200pt redesign; shoulder radius is now fully dynamic in [22,40].
+	assert.match(native, /kExpandedShoulderRMax = 40/);
 	assert.match(native, /kContentFooterGutter = 8/);
 	assert.match(native, /colorWithCalibratedWhite:0\.0 alpha:1\.0/);
 	assert.match(native, /shapeMaskLayer/);
@@ -610,12 +610,12 @@ test('premium control dimensions contract: 28pt controls, 10pt composer radius, 
 	// Composer corner radius upgraded from 7 to 10pt
 	assert.match(native, /kComposerCornerRadius = 10/,
 		'composer corner radius must be 10pt (was 7 — looked cheap)');
-	// Shoulder max increased from 28 to 32pt for gentler, more organic expansion
-	assert.match(native, /kExpandedShoulderRMax = 32\.0/,
-		'shoulder max radius must be 32pt (was 28) for smoother expansion arc');
-	// Gentler Bezier tangent: 0.45 * R (was /3.0 ≈ 0.33 — too sharp, "bitten" look)
-	assert.match(native, /effShoulderR \* 0\.45/,
-		'shoulder Bezier CP must use 0.45*R tangent offset (was /3.0 — created harsh bitten arc)');
+	// Shoulder max increased from 32 to 40pt for pronounced notch-origin concave shoulders
+	assert.match(native, /kExpandedShoulderRMax = 40\.0/,
+		'shoulder max radius must be 40pt (was 32) for pronounced notch-origin shoulders');
+	// Steeper Bezier tangent: 0.55 * R (was 0.45 — too gentle, didn't read as notch-origin)
+	assert.match(native, /effShoulderR \* 0\.55/,
+		'shoulder Bezier CP must use 0.55*R tangent offset (was 0.45 — not steep enough)');
 	// Premium composer border: 1.0pt width (was 0.5pt — barely visible)
 	assert.match(native, /layer\.borderWidth = 1\.0[\s\S]{0,200}layer\.borderColor = \[NSColor colorWithCalibratedWhite:0\.38/,
 		'composer border must be 1.0pt at 0.38 white opacity (was 0.5pt at 0.32 — too subtle)');
