@@ -1435,8 +1435,141 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 			requestId: 'req-old',
 			resolveId: 'resolve-7',
 			answers: { 'question-42': { selectedValue: 'val-a' } },
-		});
 	});
+});
+
+suite('Magnus Live Activity broad-top expanded silhouette geometry', () => {
+
+	const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+
+	test('expanded path top edge spans the full body width, not just housing width', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+
+		assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
+			'expanded top-left must anchor at (0,0)');
+		assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, totalW, 0\)/,
+			'expanded top-right must span to totalW');
+
+		const topLeftToNotch = expandedBlock.indexOf('CGPathAddLineToPoint(path, NULL, notchCenter, 0)');
+		const notchToRight = expandedBlock.indexOf('CGPathAddLineToPoint(path, NULL, notchRight, 0)');
+		const rightToEdge = expandedBlock.indexOf('CGPathAddLineToPoint(path, NULL, totalW, 0)');
+		assert.ok(topLeftToNotch > 0, 'must traverse top to notch center');
+		assert.ok(notchToRight > topLeftToNotch, 'must traverse notch center to notch right');
+		assert.ok(rightToEdge > notchToRight, 'must traverse notch right to totalW');
+	});
+
+	test('expanded shoulder radius is always 6pt, not 22-40pt', () => {
+		const computeBlock = native.slice(
+			native.indexOf('ComputeSilhouetteShoulderMetrics'),
+			native.indexOf('return metrics'),
+		);
+		assert.match(computeBlock, /CGFloat effR = 6\.0;/);
+		assert.match(computeBlock, /metrics\.effShoulderR = effR;/);
+		assert.match(computeBlock, /metrics\.opticalInset = effR;/);
+		assert.match(computeBlock, /metrics\.flare = effR;/);
+
+		assert.doesNotMatch(computeBlock, /CGFloat effR = 22;/);
+		assert.doesNotMatch(computeBlock, /CGFloat effR = 30;/);
+		assert.doesNotMatch(computeBlock, /CGFloat effR = 40;/);
+
+		assert.match(native, /The expanded broad-top geometry/);
+		assert.match(native, /no longer needs giant concave shoulders/);
+	});
+
+	test('top-attachment-to-body ratio is 1.0 for expanded states', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+
+		const moveToPoint = expandedBlock.indexOf('CGPathMoveToPoint(path, NULL, 0, 0)');
+		const lineToTotalW = expandedBlock.indexOf('CGPathAddLineToPoint(path, NULL, totalW, 0)', moveToPoint);
+		assert.ok(moveToPoint >= 0, 'must have MoveTo at origin');
+		assert.ok(lineToTotalW > moveToPoint, 'must reach totalW at top');
+
+		assert.match(expandedBlock, /top-attachment-to-body ratio near 1\.0/);
+		assert.match(expandedBlock, /instead of the old.*narrow-neck ratio/);
+	});
+
+	test('compact and expanded paths have identical element counts and types (morph compatibility)', () => {
+		const expandedEnd = native.indexOf('COMPACT/PILL GEOMETRY');
+		const expandedBlock = native.slice(
+			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
+			expandedEnd,
+		);
+		const compactBlock = native.slice(expandedEnd, native.indexOf('return path;', expandedEnd));
+
+		assert.match(expandedBlock, /CGPathCloseSubpath\(path\)/, 'expanded must close subpath');
+		assert.match(compactBlock, /CGPathCloseSubpath\(path\)/, 'compact must close subpath');
+
+		const expandedCurveCount = (expandedBlock.match(/CGPathAddCurveToPoint/g) || []).length;
+		const compactCurveCount = (compactBlock.match(/CGPathAddCurveToPoint/g) || []).length;
+		assert.strictEqual(expandedCurveCount, compactCurveCount,
+			'same CurveTo count for morph compatibility');
+
+		const expandedLineCount = (expandedBlock.match(/CGPathAddLineToPoint/g) || []).length;
+		const compactLineCount = (compactBlock.match(/CGPathAddLineToPoint/g) || []).length;
+		assert.strictEqual(expandedLineCount, compactLineCount,
+			'same LineTo count for morph compatibility');
+
+		const expandedMoveCount = (expandedBlock.match(/CGPathMoveToPoint/g) || []).length;
+		const compactMoveCount = (compactBlock.match(/CGPathMoveToPoint/g) || []).length;
+		assert.strictEqual(expandedMoveCount, compactMoveCount,
+			'same MoveTo count for morph compatibility');
+
+		const expandedCloseCount = (expandedBlock.match(/CGPathCloseSubpath/g) || []).length;
+		const compactCloseCount = (compactBlock.match(/CGPathCloseSubpath/g) || []).length;
+		assert.strictEqual(expandedCloseCount, compactCloseCount,
+			'same CloseSubpath count for morph compatibility');
+
+		assert.match(native, /ValidatePathTopology\(diagPathCollapsed, diagCurrentPath\)/);
+		assert.match(native, /ValidatePathTopology\(diagPathCollapsed, diagPathExpanded\)/);
+	});
+
+	test('nonDegenerateShoulder diagnostic is always true', () => {
+		assert.match(native, /nonDegenerateShoulder.*YES/);
+	});
+
+	test('content safe insets are stable (not dependent on large shoulder radii)', () => {
+		assert.match(native, /static const CGFloat kContentInsetX = 14;/);
+		assert.match(native, /static const CGFloat kContentSafeExtraX = 8;/);
+
+		const csiBlock = native.slice(
+			native.indexOf('static CGFloat ContentSafeInsetX'),
+			native.indexOf('return MAX(kContentInsetX, effShoulderR)') + 70,
+		);
+		assert.match(csiBlock, /MAX\(kContentInsetX, effShoulderR\) \+ kContentSafeExtraX/);
+
+		assert.match(native, /ContentSafeInsetX\(self\.content\.notched, shoulder\.effShoulderR\)/);
+
+		const expectedInset = 14 + 8;
+		assert.ok(expectedInset === 22, 'stable 22pt content safe inset');
+	});
+
+	test('expanded shoulder drop is only 6pt (shallow concave)', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+		assert.match(expandedBlock, /CGFloat shoulderDrop = 6\.0;/);
+		assert.match(expandedBlock, /totalW - effShoulderR, shoulderDrop/);
+		assert.match(expandedBlock, /effShoulderR, shoulderDrop/);
+		assert.match(expandedBlock, /shoulderDrop \/ 3\.0/);
+	});
+
+	test('expanded topology curve is degenerate (all y=0) for element parity', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('EXPANDED GEOMETRY: Broad top-edge attachment'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+		assert.match(expandedBlock, /notchLeft, 0,\s*\n\s*notchCenter, 0,\s*\n\s*notchCenter, 0/);
+		assert.match(expandedBlock, /topology.*degenerate straight line at y=0/);
+	});
+});
+
 
 	test('answer fails closed when carousel is used or invocation left waiting state', async () => {
 		const usedCarousel = {

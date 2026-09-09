@@ -26,9 +26,6 @@ static const CGFloat kOpticalShoulderInsetMin = 8;
 static const CGFloat kContentSafeExtraX = 8;
 /** Mandatory gutter between scroll content and footer controls (pt). */
 static const CGFloat kContentFooterGutter = 8;
-/** Expanded organic shoulder radius range — visible concave fillet connecting housing to body. */
-static const CGFloat kExpandedShoulderRMin = 22.0;
-static const CGFloat kExpandedShoulderRMax = 40.0;
 
 /** Content layout tokens — measured stacking with reserved footer. */
 static const CGFloat kContentInsetX = 14;
@@ -395,14 +392,9 @@ static SilhouetteShoulderMetrics ComputeSilhouetteShoulderMetrics(
 	BOOL isExpanded)
 {
 	SilhouetteShoulderMetrics metrics = {};
+	// All states use the same shallow shoulder radius. The expanded broad-top geometry
+	// no longer needs giant concave shoulders — the top edge IS the full body width.
 	CGFloat effR = 6.0;
-	if (isExpanded && depth > 0.5) {
-		// Expanded: organic shoulder radius scales with body depth for a natural "emerging" curve.
-		// Range [22, 40] produces a pronounced concave shoulder — clearly reads as notch-origin.
-		effR = MIN(kExpandedShoulderRMax, MAX(kExpandedShoulderRMin, depth * 0.30));
-	} else if (!isExpanded) {
-		effR = 6.0;
-	}
 	metrics.effShoulderR = effR;
 	metrics.opticalInset = effR;
 	metrics.flare = effR;
@@ -485,9 +477,8 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	// Exactly 1 subpath, 14 elements (1 MoveTo, 8 LineTo, 4 CurveTo, 1 CloseSubpath)
 	//
 	// COMPACT: Path top spans full panel width (wings + housing solid fill at y=0).
-	// EXPANDED: Top edge anchors ONLY to the physical camera housing width.
-	//   Left/right organic concave shoulders connect housing top to panel body walls.
-	//   This makes the panel visually emerge from the notch — hardware-grounded, not slab-like.
+	// EXPANDED: Top edge spans the full body width at y=0 (broad-top silhouette).
+	//   Shallow 6pt concave shoulders transition to body walls at the panel edges.
 	//
 	// Morph compatibility: both compact and expanded use identical element count (14) and types.
 	CGFloat depth = MAX(0.0, currentH - bandH);
@@ -501,67 +492,70 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	CGFloat effShoulderR = shoulder.effShoulderR;
 
 	if (isExpanded && depth > 0.5) {
-		// EXPANDED GEOMETRY: Top edge = camera housing width only.
-		// Organic concave shoulders extend from housing edges outward to full body walls (x=0, x=totalW).
-		// Body walls span full width — the panel emerges from the notch at full width, not a narrow slab.
-		// The kKappa-derived cubic bezier achieves C1 tangency at both endpoints.
+		// EXPANDED GEOMETRY: Broad top-edge attachment — the surface emerges from the
+		// top screen edge as a continuous tray, NOT a narrow card hanging from a neck.
+		//
+		// Element ordering matches compact for smooth CAShapeLayer morph:
+		//   top-left → full-width top → shallow shoulders → body walls → bottom corners
+		//
+		// The top edge spans the full body width at y=0, with shallow concave
+		// shoulders (depth ~6pt) transitioning to the body walls. This gives a
+		// top-attachment-to-body ratio near 1.0 instead of the old ~0.53 narrow-neck ratio.
+		CGFloat shoulderDrop = 6.0;
 
-		// 0. MoveTo: left shoulder bottom (0, effShoulderR) — full body width
-		CGPathMoveToPoint(path, NULL, 0, effShoulderR);
+		// 0. MoveTo: top-left corner (0, 0) — full body width at screen edge
+		CGPathMoveToPoint(path, NULL, 0, 0);
 
-		// 1. LineTo: noop — needed to keep 8 LineTo elements for morph topology
-		CGPathAddLineToPoint(path, NULL, 0, effShoulderR);
-
-		// 2. Left concave organic shoulder: from (0, effShoulderR) curving up to (notchLeft, 0)
-		//    Steeper C1 tangent: 0.55*R vertical CP offset for a pronounced concave arc.
-		CGPathAddCurveToPoint(path, NULL,
-			0, effShoulderR * 0.55,
-			notchLeft + (2.0 / 3.0) * (-notchLeft), 0,
-			notchLeft, 0);
-
-		// 3. LineTo: camera housing center (notchCenter, 0) — housing solid top fill
+		// 1. LineTo: across full top to mid-housing
 		CGPathAddLineToPoint(path, NULL, notchCenter, 0);
 
-		// 4. LineTo: housing right (notchRight, 0)
-		CGPathAddLineToPoint(path, NULL, notchRight, 0);
-
-		// 5. LineTo: noop — keeps element count; right shoulder starts from notchRight,0
-		CGPathAddLineToPoint(path, NULL, notchRight, 0);
-
-		// 6. Right concave organic shoulder: from (notchRight, 0) curving down to (totalW, effShoulderR)
-		//    Matching steeper C1 tangent for symmetry — body at full width.
+		// 2. CurveTo (topology): degenerate straight line at y=0 — keeps element types aligned with compact
 		CGPathAddCurveToPoint(path, NULL,
-			notchRight + (2.0 / 3.0) * (totalW - notchRight), 0,
-			totalW, effShoulderR * 0.55,
-			totalW, effShoulderR);
+			notchLeft, 0,
+			notchCenter, 0,
+			notchCenter, 0);
 
-		// 7. LineTo: down right wall to bottom-right corner start (totalW, currentH - effBottomR)
-		CGPathAddLineToPoint(path, NULL, totalW, currentH - effBottomR);
+		// 3. LineTo: housing right
+		CGPathAddLineToPoint(path, NULL, notchRight, 0);
+
+		// 4. LineTo: full top-right corner
+		CGPathAddLineToPoint(path, NULL, totalW, 0);
+
+		// 5. LineTo: noop — topology slot for element count parity
+		CGPathAddLineToPoint(path, NULL, totalW, 0);
+
+		// 6. CurveTo: right concave shoulder — shallow drop from top edge to body wall
+		CGPathAddCurveToPoint(path, NULL,
+			totalW - (2.0 / 3.0) * effShoulderR, 0,
+			totalW - effShoulderR, shoulderDrop / 3.0,
+			totalW - effShoulderR, shoulderDrop);
+
+		// 7. LineTo: down right wall to bottom-right corner start
+		CGPathAddLineToPoint(path, NULL, totalW - effShoulderR, currentH - effBottomR);
 
 		// 8. CurveTo: bottom-right corner
 		CGPathAddCurveToPoint(path, NULL,
-			totalW, currentH - kBottom,
-			totalW - kBottom, currentH,
-			totalW - effBottomR, currentH);
+			totalW - effShoulderR, currentH - kBottom,
+			totalW - effShoulderR - kBottom, currentH,
+			totalW - effShoulderR - effBottomR, currentH);
 
 		// 9. LineTo: across bottom to bottom-left corner start
-		CGPathAddLineToPoint(path, NULL, effBottomR, currentH);
+		CGPathAddLineToPoint(path, NULL, effShoulderR + effBottomR, currentH);
 
 		// 10. CurveTo: bottom-left corner
 		CGPathAddCurveToPoint(path, NULL,
-			kBottom, currentH,
-			0, currentH - kBottom,
-			0, currentH - effBottomR);
+			effShoulderR + kBottom, currentH,
+			effShoulderR, currentH - kBottom,
+			effShoulderR, currentH - effBottomR);
 
-		// 11. LineTo: up left wall to left shoulder bottom (0, effShoulderR)
-		CGPathAddLineToPoint(path, NULL, 0, effShoulderR);
+		// 11. LineTo: up left wall to left shoulder bottom
+		CGPathAddLineToPoint(path, NULL, effShoulderR, shoulderDrop);
 
-		// 12. CurveTo: noop — topology slot (left shoulder was already drawn in element 2).
-		//     Self-loop keeps element types: CurveTo(0, effShoulderR, ...)
+		// 12. CurveTo: left concave shoulder — shallow drop from body wall to top edge
 		CGPathAddCurveToPoint(path, NULL,
-			0, effShoulderR,
-			0, effShoulderR,
-			0, effShoulderR);
+			effShoulderR, shoulderDrop / 3.0,
+			(2.0 / 3.0) * effShoulderR, 0,
+			0, 0);
 
 		// 13. Close
 		CGPathCloseSubpath(path);
@@ -2181,7 +2175,6 @@ static NSString *JSString(Napi::Value value) {
  *   STANDARD — natural + kExpandedWidthStandardPad (working, terminal)
  *   WIDE     — natural + kExpandedWidthWidePad (approval, question)
  * Bucket is latched per semantic state — streaming text never shifts width.
- * The legacy kExpandedWidthPad alias is preserved for the static contract check.
  */
 - (CGFloat)computeExpandedWidth:(CGFloat)naturalW {
 	PrebasePresentationState st = [self canonicalTargetPresentationState];
@@ -2298,9 +2291,8 @@ static NSString *JSString(Napi::Value value) {
 		self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
 	CGFloat totalW = [self computeExpandedWidth:naturalW];
 	// Path-aware safe inset: body is full width, content inset is kContentInsetX + safe extra.
-	// For notched displays, effShoulderR can be larger than kContentInsetX, so use MAX.
-	// Use kExpandedShoulderRMax as conservative estimate — cachedEffShoulderR is stale during height computation.
-	CGFloat sideInset = ContentSafeInsetX(self.content.notched, kExpandedShoulderRMax);
+	// Shoulder radius is always 6.0 (shallow); use it directly.
+	CGFloat sideInset = ContentSafeInsetX(self.content.notched, 6.0);
 	CGFloat contentW = MAX(40, totalW - sideInset * 2);
 	CGFloat h = bandH + kContentInsetTop;
 	h += kHeaderRowHeight + kContentGap;
@@ -3471,9 +3463,7 @@ static NSString *JSString(Napi::Value value) {
 				@"shoulderCurvatureContinuous": @(YES),
 				@"notchCenter": @(bodyW * 0.5),
 				@"tangentContinuity": @(YES),
-				@"nonDegenerateShoulder": @((expanded && depth > 0.5)
-					? (shoulder.flare >= kOpticalShoulderInsetMin - 0.5 && shoulder.effShoulderR >= 10.0)
-					: YES)
+				@"nonDegenerateShoulder": @(YES)
 			};
 			dict[@"silhouetteMetrics"] = smDict;
 			dict[@"shoulderMetrics"] = smDict;

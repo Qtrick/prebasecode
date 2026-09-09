@@ -405,8 +405,8 @@ assert.ok(snap.recentActions.every(a => typeof a.label === 'string' && a.label.l
 test('native notch polish contracts: optical shoulder, true viewport, action id reconcile, footer gutter', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	assert.match(native, /kOpticalShoulderInsetMin = 8/);
-	// kOpticalShoulderInsetMax was removed in the 200pt redesign; shoulder radius is now fully dynamic in [22,40].
-	assert.match(native, /kExpandedShoulderRMax = 40/);
+	// kExpandedShoulderRMin/kExpandedShoulderRMax removed — effShoulderR is now hardcoded to 6.0 for broad-top expanded geometry.
+	assert.match(native, /CGFloat effR = 6\.0/);
 	assert.match(native, /kContentFooterGutter = 8/);
 	assert.match(native, /colorWithCalibratedWhite:0\.0 alpha:1\.0/);
 	assert.match(native, /shapeMaskLayer/);
@@ -599,7 +599,7 @@ test('width buckets are purely semantic — no streaming-induced width churn', (
 		'width must not depend on raw pending content length (causes streaming churn)');
 });
 
-test('premium control dimensions contract: 28pt controls, 10pt composer radius, 32pt shoulder max', () => {
+test('premium control dimensions contract: 28pt controls, 10pt composer radius, 6pt shoulder', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	// Control height upgraded from 24 to 28pt for premium feel
 	assert.match(native, /kControlHeight = 28/,
@@ -610,12 +610,12 @@ test('premium control dimensions contract: 28pt controls, 10pt composer radius, 
 	// Composer corner radius upgraded from 7 to 10pt
 	assert.match(native, /kComposerCornerRadius = 10/,
 		'composer corner radius must be 10pt (was 7 — looked cheap)');
-	// Shoulder max increased from 32 to 40pt for pronounced notch-origin concave shoulders
-	assert.match(native, /kExpandedShoulderRMax = 40\.0/,
-		'shoulder max radius must be 40pt (was 32) for pronounced notch-origin shoulders');
-	// Steeper Bezier tangent: 0.55 * R (was 0.45 — too gentle, didn't read as notch-origin)
-	assert.match(native, /effShoulderR \* 0\.55/,
-		'shoulder Bezier CP must use 0.55*R tangent offset (was 0.45 — not steep enough)');
+	// Shoulder radius is now hardcoded to 6pt for broad-top expanded geometry (was 40pt max for narrow-neck)
+	assert.match(native, /CGFloat effR = 6\.0/,
+		'shoulder radius must be 6pt for broad-top expanded geometry');
+	// Steep Bezier tangent for shallow shoulders (kKappa ≈ 0.552)
+	assert.match(native, /kKappa = 0\.55/,
+		'shoulder Bezier CP must use kKappa tangent offset');
 	// Premium composer border: 1.0pt width (was 0.5pt — barely visible)
 	assert.match(native, /layer\.borderWidth = 1\.0[\s\S]{0,200}layer\.borderColor = \[NSColor colorWithCalibratedWhite:0\.38/,
 		'composer border must be 1.0pt at 0.38 white opacity (was 0.5pt at 0.32 — too subtle)');

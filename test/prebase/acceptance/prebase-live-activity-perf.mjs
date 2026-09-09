@@ -3805,18 +3805,10 @@ async function run() {
 		if (sm.nonDegenerateShoulder !== true) {
 			throw new Error(`natural-width interactive must report nonDegenerateShoulder=true (flare=${flare}, optical=${optical}, effR=${effR})`);
 		}
-		// Natural span: optical inset within [8,12] OR real lateral flare with effR >= 10.
-		if (optical > 0) {
-			// Organic shoulder: opticalTopInset reflects actual expanded shoulder radius (22-40pt).
-			if (!(optical >= 20 && optical <= 42)) {
-				throw new Error(`opticalTopInset must be in [20,42] for organic expanded shoulder, got ${optical}`);
-			}
-		} else if (!(flare >= 7.5)) {
-			throw new Error(`without optical inset, shoulderFlare must still be non-degenerate (>=8), got ${flare}`);
-		}
-		// Expanded organic shoulder: effR must be in [20, 42] (updated for larger notch-origin shoulders).
-		if (!(effR >= 20)) {
-			throw new Error(`effShoulderR must be >= 20 for expanded interactive organic shoulder, got ${effR}`);
+		// Broad-top expanded geometry: shoulder is always shallow (6pt).
+		// The meaningful metric is the top-attachment-to-body ratio, not shoulder radius.
+		if (!(effR >= 5 && effR <= 8)) {
+			throw new Error(`effShoulderR must be ~6 for broad-top expanded geometry, got ${effR}`);
 		}
 		if (diag.shapeMaskSynced !== true && diag.shapeMaskSynced !== undefined) {
 			throw new Error(`shapeMaskSynced should be true when path exists, got ${diag.shapeMaskSynced}`);

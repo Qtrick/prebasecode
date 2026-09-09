@@ -1,26 +1,26 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity",
-  "sourceHead": "04614df71baf4868430981dbcc6e1adefeebe333",
-  "sourceFingerprint": "7c57ccd4756e37b8d1882b53b9be2648e1ac010ebe819c9d30fc781f26e318b4",
-  "productFingerprint": "7c57ccd4756e37b8d1882b53b9be2648e1ac010ebe819c9d30fc781f26e318b4",
-  "generatedAt": "2026-09-09T03:46:36.758Z",
+  "sourceHead": "39dfa9126bab3b97b83d84df05e0f572a2ca0cd1",
+  "sourceFingerprint": "f5b47b507758015fd5670688014cea449c2f9556d3efc4198eeb733a8515c87b",
+  "productFingerprint": "f5b47b507758015fd5670688014cea449c2f9556d3efc4198eeb733a8515c87b",
+  "generatedAt": "2026-09-09T18:17:38.920Z",
   "producerId": "magnus-live-activity",
-  "producerFingerprint": "c4843a902883235a25e2f433357b120d1652da72b12e75eb87cd92c7f023855b",
+  "producerFingerprint": "133fd9abeef87ca74a40c0b87ae73c8dbde30bd3dd48e60c09c756c86c9d9f3d",
   "kind": "magnus-live-activity-live",
   "testKind": "live-runtime",
   "liveGui": "native-appkit-panel",
   "platform": "darwin",
   "nativePresent": true,
   "mode": "alwaysWorking",
-  "prebasePid": 25695,
-  "launchMs": 3277,
+  "prebasePid": 43401,
+  "launchMs": 5330,
   "smokeTransportInstalled": true,
   "diagnosticsAfterOpen": {
     "backend": "native-appkit",
-    "revision": 2,
-    "sessionId": "5d2f1568-511a-4725-b8a2-652087c85121",
-    "sessionResource": "vscode-chat-session://local/NWQyZjE1NjgtNTExYS00NzI1LWI4YTItNjUyMDg3Yzg1MTIx",
+    "revision": 3,
+    "sessionId": "4310c47c-fb9c-4902-82cd-cdedac2bc5ab",
+    "sessionResource": "vscode-chat-session://local/NDMxMGM0N2MtZmI5Yy00OTAyLTgyY2QtY2RlZGFjMmJjNWFi",
     "status": "waiting",
     "visible": true,
     "presentationLabel": "Waiting",
@@ -40,7 +40,7 @@
       "denyButtonAlpha": 1,
       "openButtonTitle": "Open in PreBase",
       "actualVisibleViewportBottom": 0,
-      "environmentState": "backgrounded",
+      "environmentState": "available",
       "trackingAreaCount": 1,
       "contentSafeViewport": {
         "y": 6,
@@ -112,7 +112,7 @@
       "semanticContentSubtree": "compactContainer",
       "questionButtonLabels": [],
       "prebaseFullscreen": false,
-      "windowNumber": 62652,
+      "windowNumber": 64974,
       "openButtonFrame": null,
       "displayMode": "builtin",
       "collapsedHit": {
@@ -126,10 +126,10 @@
       "approveButtonAlpha": 1,
       "inactiveSubtreesSuppressed": true,
       "renderedPeekBody": "",
-      "revision": 1,
+      "revision": 2,
       "hoverSessionToken": 0,
       "shapeMaskSynced": true,
-      "buildFingerprint": "native-vSep  8 2026-23:25:08",
+      "buildFingerprint": "native-vSep  9 2026-13:59:50",
       "composerFrame": null,
       "screenLocalizedName": "Built-in Retina Display",
       "pendingMessageFullyVisible": true,
@@ -179,7 +179,7 @@
           "height": 0
         }
       ],
-      "buildTimestamp": "Sep  8 2026 23:25:08",
+      "buildTimestamp": "Sep  9 2026 13:59:50",
       "auxiliaryTopLeftArea": {
         "y": 950,
         "x": 0,
@@ -256,7 +256,7 @@
       "optionButtonsVisible": false,
       "supportingChromeSubtree": null,
       "approveButtonAccessibilityLabel": "Approve",
-      "lastRenderedRevision": 1,
+      "lastRenderedRevision": 2,
       "inactiveInteractiveSubtreeSuppressed": true,
       "contentScrollEnabled": false,
       "contentPopulated": true,
@@ -275,7 +275,7 @@
       "expandedContainerAlpha": 0,
       "peekLabelFrame": null,
       "canonicalPresentationState": "compact",
-      "contentRefreshCount": 2,
+      "contentRefreshCount": 3,
       "pendingTitleFrame": {
         "y": 0,
         "x": 0,
@@ -292,7 +292,7 @@
         "width": 0,
         "height": 0
       },
-      "contentOnlyUpdateCount": 1,
+      "contentOnlyUpdateCount": 2,
       "contentViewport": {
         "y": 0,
         "x": 0,
@@ -305,7 +305,7 @@
       "retainedWorkScreen": false,
       "notchDetected": true,
       "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-      "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+      "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
     }
   },
   "nativeDiagnostics": {
@@ -319,7 +319,7 @@
     "denyButtonAlpha": 1,
     "openButtonTitle": "Open in PreBase",
     "actualVisibleViewportBottom": 0,
-    "environmentState": "backgrounded",
+    "environmentState": "available",
     "trackingAreaCount": 1,
     "contentSafeViewport": {
       "y": 6,
@@ -391,7 +391,7 @@
     "semanticContentSubtree": "compactContainer",
     "questionButtonLabels": [],
     "prebaseFullscreen": false,
-    "windowNumber": 62652,
+    "windowNumber": 64974,
     "openButtonFrame": null,
     "displayMode": "builtin",
     "collapsedHit": {
@@ -405,10 +405,10 @@
     "approveButtonAlpha": 1,
     "inactiveSubtreesSuppressed": true,
     "renderedPeekBody": "",
-    "revision": 2,
+    "revision": 3,
     "hoverSessionToken": 0,
     "shapeMaskSynced": true,
-    "buildFingerprint": "native-vSep  8 2026-23:25:08",
+    "buildFingerprint": "native-vSep  9 2026-13:59:50",
     "composerFrame": null,
     "screenLocalizedName": "Built-in Retina Display",
     "pendingMessageFullyVisible": true,
@@ -458,7 +458,7 @@
         "height": 0
       }
     ],
-    "buildTimestamp": "Sep  8 2026 23:25:08",
+    "buildTimestamp": "Sep  9 2026 13:59:50",
     "auxiliaryTopLeftArea": {
       "y": 950,
       "x": 0,
@@ -535,7 +535,7 @@
     "optionButtonsVisible": false,
     "supportingChromeSubtree": null,
     "approveButtonAccessibilityLabel": "Approve",
-    "lastRenderedRevision": 2,
+    "lastRenderedRevision": 3,
     "inactiveInteractiveSubtreeSuppressed": true,
     "contentScrollEnabled": false,
     "contentPopulated": true,
@@ -554,7 +554,7 @@
     "expandedContainerAlpha": 0,
     "peekLabelFrame": null,
     "canonicalPresentationState": "compact",
-    "contentRefreshCount": 3,
+    "contentRefreshCount": 4,
     "pendingTitleFrame": {
       "y": 0,
       "x": 0,
@@ -571,7 +571,7 @@
       "width": 0,
       "height": 0
     },
-    "contentOnlyUpdateCount": 1,
+    "contentOnlyUpdateCount": 2,
     "contentViewport": {
       "y": 0,
       "x": 0,
@@ -584,23 +584,23 @@
     "retainedWorkScreen": false,
     "notchDetected": true,
     "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-    "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+    "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
   },
   "questionSeed": {
     "ok": true,
     "kind": "question",
-    "interactionId": "smoke-la-question-1788925606235:0",
+    "interactionId": "smoke-la-question-1788977870502:0",
     "optionId": "Option A",
-    "sessionId": "5d2f1568-511a-4725-b8a2-652087c85121",
-    "revision": 4,
+    "sessionId": "4310c47c-fb9c-4902-82cd-cdedac2bc5ab",
+    "revision": 5,
     "liveActivityPendingKind": "question",
     "liveActivityStatus": "attention"
   },
   "questionDiagnosticsBefore": {
     "backend": "native-appkit",
-    "revision": 5,
-    "sessionId": "5d2f1568-511a-4725-b8a2-652087c85121",
-    "sessionResource": "vscode-chat-session://local/NWQyZjE1NjgtNTExYS00NzI1LWI4YTItNjUyMDg3Yzg1MTIx",
+    "revision": 6,
+    "sessionId": "4310c47c-fb9c-4902-82cd-cdedac2bc5ab",
+    "sessionResource": "vscode-chat-session://local/NDMxMGM0N2MtZmI5Yy00OTAyLTgyY2QtY2RlZGFjMmJjNWFi",
     "status": "attention",
     "visible": true,
     "pendingKind": "question",
@@ -621,7 +621,7 @@
       "denyButtonAlpha": 1,
       "openButtonTitle": "Open in PreBase",
       "actualVisibleViewportBottom": 24,
-      "environmentState": "backgrounded",
+      "environmentState": "available",
       "trackingAreaCount": 1,
       "contentSafeViewport": {
         "y": 6,
@@ -653,22 +653,22 @@
       "bandHeight": 34,
       "activityFrame": null,
       "panelVisible": true,
-      "metricsLabel": "5s",
+      "metricsLabel": "6s",
       "interactiveContentVisible": false,
       "transitionInFlight": false,
       "silhouetteMetrics": {
-        "topLeftX": 22,
-        "topRightX": 291,
+        "topLeftX": 6,
+        "topRightX": 307,
         "bodyDepth": 32,
-        "shoulderFlare": 22,
-        "contentSafeInsetX": 30,
-        "effShoulderR": 22,
+        "shoulderFlare": 6,
+        "contentSafeInsetX": 22,
+        "effShoulderR": 6,
         "notchCenter": 156.5,
         "nonDegenerateShoulder": true,
         "cachedEffShoulderR": 6,
         "panelWidth": 313,
         "shoulderCurvatureContinuous": true,
-        "opticalTopInset": 22,
+        "opticalTopInset": 6,
         "tangentContinuity": true
       },
       "lastHapticReason": "none",
@@ -678,7 +678,7 @@
       "semanticContentSubtree": "peekContainer",
       "questionButtonLabels": [],
       "prebaseFullscreen": false,
-      "windowNumber": 62652,
+      "windowNumber": 64974,
       "openButtonFrame": null,
       "displayMode": "builtin",
       "collapsedHit": {
@@ -692,10 +692,10 @@
       "approveButtonAlpha": 1,
       "inactiveSubtreesSuppressed": true,
       "renderedPeekBody": "Smoke",
-      "revision": 4,
+      "revision": 5,
       "hoverSessionToken": 0,
       "shapeMaskSynced": true,
-      "buildFingerprint": "native-vSep  8 2026-23:25:08",
+      "buildFingerprint": "native-vSep  9 2026-13:59:50",
       "composerFrame": null,
       "screenLocalizedName": "Built-in Retina Display",
       "pendingMessageFullyVisible": true,
@@ -726,7 +726,7 @@
         "height": 32
       },
       "actionFrames": [],
-      "buildTimestamp": "Sep  8 2026 23:25:08",
+      "buildTimestamp": "Sep  9 2026 13:59:50",
       "auxiliaryTopLeftArea": {
         "y": 950,
         "x": 0,
@@ -771,7 +771,7 @@
       "approvalControlsVisible": false,
       "actionInFlight": false,
       "screenTopY": 982,
-      "geometrySignature": "e=1;p=1;pin=0;att=1;st=attention;kind=question;id=smoke-la-question-1788925606235:0;opts=2;appr=0;dest=0;acts=1;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+      "geometrySignature": "e=1;p=1;pin=0;att=1;st=attention;kind=question;id=smoke-la-question-1788977870502:0;opts=2;appr=0;dest=0;acts=1;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
       "approveDenyVisible": false,
       "redrawCount": 3,
       "shapeAwareHitTesting": true,
@@ -780,21 +780,21 @@
       "approveButtonFrame": null,
       "layerBacked": true,
       "accessibilityLabel": "Question",
-      "interactionId": "smoke-la-question-1788925606235:0",
+      "interactionId": "smoke-la-question-1788977870502:0",
       "orderFrontCount": 1,
       "shoulderMetrics": {
-        "topLeftX": 22,
-        "topRightX": 291,
+        "topLeftX": 6,
+        "topRightX": 307,
         "bodyDepth": 32,
-        "shoulderFlare": 22,
-        "contentSafeInsetX": 30,
-        "effShoulderR": 22,
+        "shoulderFlare": 6,
+        "contentSafeInsetX": 22,
+        "effShoulderR": 6,
         "notchCenter": 156.5,
         "nonDegenerateShoulder": true,
         "cachedEffShoulderR": 6,
         "panelWidth": 313,
         "shoulderCurvatureContinuous": true,
-        "opticalTopInset": 22,
+        "opticalTopInset": 6,
         "tangentContinuity": true
       },
       "panelTopY": 982,
@@ -803,7 +803,7 @@
       "optionButtonsVisible": false,
       "supportingChromeSubtree": "compactContainer",
       "approveButtonAccessibilityLabel": "Approve",
-      "lastRenderedRevision": 4,
+      "lastRenderedRevision": 5,
       "inactiveInteractiveSubtreeSuppressed": true,
       "contentScrollEnabled": false,
       "contentPopulated": true,
@@ -823,14 +823,14 @@
         "height": 16
       },
       "canonicalPresentationState": "attentionPeek",
-      "contentRefreshCount": 5,
+      "contentRefreshCount": 6,
       "pendingTitleFrame": null,
       "geometryTransitionCount": 3,
       "peekContainerAlpha": 1,
       "peekLabelVisible": true,
       "pinButtonVisible": false,
       "headerFrame": null,
-      "contentOnlyUpdateCount": 2,
+      "contentOnlyUpdateCount": 3,
       "contentViewport": {
         "y": 0,
         "x": 0,
@@ -843,29 +843,29 @@
       "retainedWorkScreen": false,
       "notchDetected": true,
       "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-      "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+      "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
     }
   },
   "questionContinuity": {
     "ok": true,
-    "interactionId": "smoke-la-question-1788925606235:0",
+    "interactionId": "smoke-la-question-1788977870502:0",
     "liveActivityPendingKind": "question",
     "liveActivityStatus": "attention"
   },
   "approvalSeed": {
     "ok": true,
     "kind": "approval",
-    "interactionId": "smoke-la-approval-1788925606464",
-    "sessionId": "5d2f1568-511a-4725-b8a2-652087c85121",
-    "revision": 8,
+    "interactionId": "smoke-la-approval-1788977870727",
+    "sessionId": "4310c47c-fb9c-4902-82cd-cdedac2bc5ab",
+    "revision": 9,
     "liveActivityPendingKind": "approval",
     "liveActivityStatus": "attention"
   },
   "approvalDiagnosticsBefore": {
     "backend": "native-appkit",
-    "revision": 9,
-    "sessionId": "5d2f1568-511a-4725-b8a2-652087c85121",
-    "sessionResource": "vscode-chat-session://local/NWQyZjE1NjgtNTExYS00NzI1LWI4YTItNjUyMDg3Yzg1MTIx",
+    "revision": 10,
+    "sessionId": "4310c47c-fb9c-4902-82cd-cdedac2bc5ab",
+    "sessionResource": "vscode-chat-session://local/NDMxMGM0N2MtZmI5Yy00OTAyLTgyY2QtY2RlZGFjMmJjNWFi",
     "status": "attention",
     "visible": true,
     "pendingKind": "approval",
@@ -886,7 +886,7 @@
       "denyButtonAlpha": 1,
       "openButtonTitle": "Open in PreBase",
       "actualVisibleViewportBottom": 24,
-      "environmentState": "backgrounded",
+      "environmentState": "available",
       "trackingAreaCount": 1,
       "contentSafeViewport": {
         "y": 6,
@@ -918,22 +918,22 @@
       "bandHeight": 34,
       "activityFrame": null,
       "panelVisible": true,
-      "metricsLabel": "5s",
+      "metricsLabel": "6s",
       "interactiveContentVisible": false,
       "transitionInFlight": false,
       "silhouetteMetrics": {
-        "topLeftX": 22,
-        "topRightX": 291,
+        "topLeftX": 6,
+        "topRightX": 307,
         "bodyDepth": 32,
-        "shoulderFlare": 22,
-        "contentSafeInsetX": 30,
-        "effShoulderR": 22,
+        "shoulderFlare": 6,
+        "contentSafeInsetX": 22,
+        "effShoulderR": 6,
         "notchCenter": 156.5,
         "nonDegenerateShoulder": true,
         "cachedEffShoulderR": 6,
         "panelWidth": 313,
         "shoulderCurvatureContinuous": true,
-        "opticalTopInset": 22,
+        "opticalTopInset": 6,
         "tangentContinuity": true
       },
       "lastHapticReason": "none",
@@ -943,7 +943,7 @@
       "semanticContentSubtree": "peekContainer",
       "questionButtonLabels": [],
       "prebaseFullscreen": false,
-      "windowNumber": 62652,
+      "windowNumber": 64974,
       "openButtonFrame": null,
       "displayMode": "builtin",
       "collapsedHit": {
@@ -957,10 +957,10 @@
       "approveButtonAlpha": 1,
       "inactiveSubtreesSuppressed": true,
       "renderedPeekBody": "Allow Agents to delete this file?",
-      "revision": 8,
+      "revision": 9,
       "hoverSessionToken": 1,
       "shapeMaskSynced": true,
-      "buildFingerprint": "native-vSep  8 2026-23:25:08",
+      "buildFingerprint": "native-vSep  9 2026-13:59:50",
       "composerFrame": null,
       "screenLocalizedName": "Built-in Retina Display",
       "pendingMessageFullyVisible": true,
@@ -991,7 +991,7 @@
         "height": 32
       },
       "actionFrames": [],
-      "buildTimestamp": "Sep  8 2026 23:25:08",
+      "buildTimestamp": "Sep  9 2026 13:59:50",
       "auxiliaryTopLeftArea": {
         "y": 950,
         "x": 0,
@@ -1036,7 +1036,7 @@
       "approvalControlsVisible": false,
       "actionInFlight": false,
       "screenTopY": 982,
-      "geometrySignature": "e=1;p=1;pin=0;att=1;st=attention;kind=approval;id=smoke-la-approval-1788925606464;opts=0;appr=1;dest=0;acts=2;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+      "geometrySignature": "e=1;p=1;pin=0;att=1;st=attention;kind=approval;id=smoke-la-approval-1788977870727;opts=0;appr=1;dest=0;acts=2;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
       "approveDenyVisible": false,
       "redrawCount": 5,
       "shapeAwareHitTesting": true,
@@ -1045,21 +1045,21 @@
       "approveButtonFrame": null,
       "layerBacked": true,
       "accessibilityLabel": "Approve",
-      "interactionId": "smoke-la-approval-1788925606464",
+      "interactionId": "smoke-la-approval-1788977870727",
       "orderFrontCount": 1,
       "shoulderMetrics": {
-        "topLeftX": 22,
-        "topRightX": 291,
+        "topLeftX": 6,
+        "topRightX": 307,
         "bodyDepth": 32,
-        "shoulderFlare": 22,
-        "contentSafeInsetX": 30,
-        "effShoulderR": 22,
+        "shoulderFlare": 6,
+        "contentSafeInsetX": 22,
+        "effShoulderR": 6,
         "notchCenter": 156.5,
         "nonDegenerateShoulder": true,
         "cachedEffShoulderR": 6,
         "panelWidth": 313,
         "shoulderCurvatureContinuous": true,
-        "opticalTopInset": 22,
+        "opticalTopInset": 6,
         "tangentContinuity": true
       },
       "panelTopY": 982,
@@ -1068,7 +1068,7 @@
       "optionButtonsVisible": false,
       "supportingChromeSubtree": "compactContainer",
       "approveButtonAccessibilityLabel": "Approve",
-      "lastRenderedRevision": 8,
+      "lastRenderedRevision": 9,
       "inactiveInteractiveSubtreeSuppressed": true,
       "contentScrollEnabled": false,
       "contentPopulated": true,
@@ -1088,14 +1088,14 @@
         "height": 16
       },
       "canonicalPresentationState": "attentionPeek",
-      "contentRefreshCount": 9,
+      "contentRefreshCount": 10,
       "pendingTitleFrame": null,
       "geometryTransitionCount": 5,
       "peekContainerAlpha": 1,
       "peekLabelVisible": true,
       "pinButtonVisible": false,
       "headerFrame": null,
-      "contentOnlyUpdateCount": 4,
+      "contentOnlyUpdateCount": 5,
       "contentViewport": {
         "y": 0,
         "x": 0,
@@ -1108,12 +1108,12 @@
       "retainedWorkScreen": false,
       "notchDetected": true,
       "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-      "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+      "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
     }
   },
   "approvalContinuity": {
     "ok": true,
-    "interactionId": "smoke-la-approval-1788925606464"
+    "interactionId": "smoke-la-approval-1788977870727"
   },
   "followUpSimulation": {
     "ok": true,
@@ -1130,7 +1130,7 @@
     "captured": false,
     "isDesktopContext": false,
     "reason": "screencapture-unavailable",
-    "error": "Error: Command failed: screencapture -x -R355,0,800,360 \"/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-interactive-context.png\"\ncould not create image from rect\n"
+    "error": "Error: Command failed: screencapture -x -R356,0,800,360 \"/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-interactive-context.png\"\ncould not create image from rect\n"
   },
   "peekScreenshot": {
     "captured": false,
@@ -1168,7 +1168,7 @@
     "workingInteractive": {
       "seed": {
         "ok": true,
-        "revision": 14,
+        "revision": 15,
         "status": "working",
         "variant": "working",
         "nativePresentation": "pinned",
@@ -1192,12 +1192,12 @@
         "trackingAreaCount": 1,
         "contentSafeViewport": {
           "y": 25,
-          "x": 44.9,
-          "width": 259.2,
+          "x": 22,
+          "width": 305,
           "height": 35
         },
         "denyButtonFrame": null,
-        "environmentState": "backgrounded",
+        "environmentState": "available",
         "peekContainerVisible": false,
         "notchGeometry": {
           "trailingX": 848,
@@ -1221,8 +1221,8 @@
         "bandHeight": 34,
         "activityFrame": {
           "y": 2,
-          "x": 44.9,
-          "width": 259.2,
+          "x": 22,
+          "width": 305,
           "height": 15
         },
         "panelVisible": true,
@@ -1230,18 +1230,18 @@
         "interactiveContentVisible": true,
         "transitionInFlight": false,
         "silhouetteMetrics": {
-          "topLeftX": 36.9,
-          "topRightX": 312.1,
+          "topLeftX": 6,
+          "topRightX": 343,
           "bodyDepth": 123,
-          "shoulderFlare": 36.9,
-          "contentSafeInsetX": 44.9,
-          "effShoulderR": 36.9,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 174.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 36.9,
+          "cachedEffShoulderR": 6,
           "panelWidth": 349,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 36.9,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "lastHapticReason": "none",
@@ -1249,17 +1249,17 @@
         "approveButtonTitle": "Approve",
         "statusBadgeFrame": {
           "y": 6,
-          "x": 260.1,
+          "x": 283,
           "width": 44,
           "height": 16
         },
         "semanticContentSubtree": "expandedContainer",
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 62652,
+        "windowNumber": 64974,
         "openButtonFrame": {
           "y": 68,
-          "x": 276.1,
+          "x": 299,
           "width": 28,
           "height": 28
         },
@@ -1280,17 +1280,17 @@
         "approveButtonAlpha": 1,
         "inactiveSubtreesSuppressed": true,
         "renderedPeekBody": "",
-        "revision": 14,
+        "revision": 15,
         "hoverSessionToken": 4,
         "shapeMaskSynced": true,
         "displayMode": "builtin",
         "composerFrame": {
           "y": 68,
-          "x": 44.9,
-          "width": 191.2,
+          "x": 22,
+          "width": 237,
           "height": 28
         },
-        "buildFingerprint": "native-vSep  8 2026-23:25:08",
+        "buildFingerprint": "native-vSep  9 2026-13:59:50",
         "screenLocalizedName": "Built-in Retina Display",
         "pendingMessageFullyVisible": true,
         "accessibilityRole": "AXGroup",
@@ -1320,7 +1320,7 @@
           "height": 32
         },
         "actionFrames": [],
-        "buildTimestamp": "Sep  8 2026 23:25:08",
+        "buildTimestamp": "Sep  9 2026 13:59:50",
         "auxiliaryTopLeftArea": {
           "y": 950,
           "x": 0,
@@ -1378,24 +1378,24 @@
         "interactionId": "",
         "orderFrontCount": 1,
         "shoulderMetrics": {
-          "topLeftX": 36.9,
-          "topRightX": 312.1,
+          "topLeftX": 6,
+          "topRightX": 343,
           "bodyDepth": 123,
-          "shoulderFlare": 36.9,
-          "contentSafeInsetX": 44.9,
-          "effShoulderR": 36.9,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 174.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 36.9,
+          "cachedEffShoulderR": 6,
           "panelWidth": 349,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 36.9,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "panelTopY": 982,
         "pinButtonFrame": {
           "y": 68,
-          "x": 242.1,
+          "x": 265,
           "width": 28,
           "height": 28
         },
@@ -1403,7 +1403,7 @@
         "optionButtonsVisible": false,
         "supportingChromeSubtree": null,
         "approveButtonAccessibilityLabel": "Approve",
-        "lastRenderedRevision": 14,
+        "lastRenderedRevision": 15,
         "inactiveInteractiveSubtreeSuppressed": true,
         "contentScrollEnabled": true,
         "contentPopulated": true,
@@ -1418,7 +1418,7 @@
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
         "canonicalPresentationState": "interactiveWorking",
-        "contentRefreshCount": 24,
+        "contentRefreshCount": 25,
         "pendingTitleFrame": null,
         "geometryTransitionCount": 13,
         "peekContainerAlpha": 0,
@@ -1426,11 +1426,11 @@
         "pinButtonVisible": true,
         "headerFrame": {
           "y": 6,
-          "x": 44.9,
-          "width": 207.2,
+          "x": 22,
+          "width": 253,
           "height": 16
         },
-        "contentOnlyUpdateCount": 7,
+        "contentOnlyUpdateCount": 8,
         "contentViewport": {
           "y": 25,
           "x": 0,
@@ -1443,7 +1443,7 @@
         "retainedWorkScreen": false,
         "notchDetected": true,
         "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-        "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+        "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
       },
       "screenshot": {
         "captured": false,
@@ -1462,7 +1462,7 @@
     "question": {
       "seed": {
         "ok": true,
-        "revision": 15,
+        "revision": 16,
         "status": "attention",
         "variant": "question",
         "nativePresentation": "attentionInteractive",
@@ -1486,12 +1486,12 @@
         "trackingAreaCount": 1,
         "contentSafeViewport": {
           "y": 25,
-          "x": 48,
-          "width": 301,
+          "x": 22,
+          "width": 353,
           "height": 66
         },
         "denyButtonFrame": null,
-        "environmentState": "backgrounded",
+        "environmentState": "available",
         "peekContainerVisible": false,
         "notchGeometry": {
           "trailingX": 848,
@@ -1503,8 +1503,8 @@
         "localMonitorInstalled": true,
         "pendingMessageFrame": {
           "y": 37,
-          "x": 48,
-          "width": 301,
+          "x": 22,
+          "width": 353,
           "height": 28
         },
         "pendingMessage": "This choice affects Fit View metrics and Temporal Full Map readability checks.",
@@ -1524,18 +1524,18 @@
         "interactiveContentVisible": true,
         "transitionInFlight": false,
         "silhouetteMetrics": {
-          "topLeftX": 40,
-          "topRightX": 357,
+          "topLeftX": 6,
+          "topRightX": 391,
           "bodyDepth": 186,
-          "shoulderFlare": 40,
-          "contentSafeInsetX": 48,
-          "effShoulderR": 40,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 198.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 40,
+          "cachedEffShoulderR": 6,
           "panelWidth": 397,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 40,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "lastHapticReason": "none",
@@ -1543,7 +1543,7 @@
         "approveButtonTitle": "Approve",
         "statusBadgeFrame": {
           "y": 6,
-          "x": 298.71462070941925,
+          "x": 324.71462070941925,
           "width": 50.28537929058075,
           "height": 16
         },
@@ -1555,7 +1555,7 @@
           "Clustered"
         ],
         "prebaseFullscreen": false,
-        "windowNumber": 62652,
+        "windowNumber": 64974,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 25,
@@ -1574,12 +1574,12 @@
         "approveButtonAlpha": 1,
         "inactiveSubtreesSuppressed": true,
         "renderedPeekBody": "",
-        "revision": 15,
+        "revision": 16,
         "hoverSessionToken": 4,
         "shapeMaskSynced": true,
         "displayMode": "builtin",
         "composerFrame": null,
-        "buildFingerprint": "native-vSep  8 2026-23:25:08",
+        "buildFingerprint": "native-vSep  9 2026-13:59:50",
         "screenLocalizedName": "Built-in Retina Display",
         "pendingMessageFullyVisible": true,
         "accessibilityRole": "AXGroup",
@@ -1609,7 +1609,7 @@
           "height": 32
         },
         "actionFrames": [],
-        "buildTimestamp": "Sep  8 2026 23:25:08",
+        "buildTimestamp": "Sep  9 2026 13:59:50",
         "auxiliaryTopLeftArea": {
           "y": 950,
           "x": 0,
@@ -1622,26 +1622,26 @@
         "optionButtonFrames": [
           {
             "y": 99,
-            "x": 48,
-            "width": 147,
+            "x": 22,
+            "width": 173,
             "height": 28
           },
           {
             "y": 99,
             "x": 201,
-            "width": 148,
+            "width": 174,
             "height": 28
           },
           {
             "y": 131,
-            "x": 48,
-            "width": 147,
+            "x": 22,
+            "width": 173,
             "height": 28
           },
           {
             "y": 131,
             "x": 201,
-            "width": 148,
+            "width": 174,
             "height": 28
           }
         ],
@@ -1692,18 +1692,18 @@
         "interactionId": "visual-question-1",
         "orderFrontCount": 1,
         "shoulderMetrics": {
-          "topLeftX": 40,
-          "topRightX": 357,
+          "topLeftX": 6,
+          "topRightX": 391,
           "bodyDepth": 186,
-          "shoulderFlare": 40,
-          "contentSafeInsetX": 48,
-          "effShoulderR": 40,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 198.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 40,
+          "cachedEffShoulderR": 6,
           "panelWidth": 397,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 40,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "panelTopY": 982,
@@ -1712,7 +1712,7 @@
         "optionButtonsVisible": true,
         "supportingChromeSubtree": null,
         "approveButtonAccessibilityLabel": "Approve",
-        "lastRenderedRevision": 15,
+        "lastRenderedRevision": 16,
         "inactiveInteractiveSubtreeSuppressed": true,
         "contentScrollEnabled": true,
         "contentPopulated": true,
@@ -1727,11 +1727,11 @@
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
         "canonicalPresentationState": "interactiveQuestion",
-        "contentRefreshCount": 27,
+        "contentRefreshCount": 28,
         "pendingTitleFrame": {
           "y": 2,
-          "x": 48,
-          "width": 301,
+          "x": 22,
+          "width": 353,
           "height": 32
         },
         "geometryTransitionCount": 15,
@@ -1740,11 +1740,11 @@
         "pinButtonVisible": false,
         "headerFrame": {
           "y": 6,
-          "x": 48,
-          "width": 242.71462070941925,
+          "x": 22,
+          "width": 294.71462070941925,
           "height": 16
         },
-        "contentOnlyUpdateCount": 7,
+        "contentOnlyUpdateCount": 8,
         "contentViewport": {
           "y": 25,
           "x": 0,
@@ -1757,7 +1757,7 @@
         "retainedWorkScreen": false,
         "notchDetected": true,
         "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-        "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+        "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
       },
       "screenshot": {
         "captured": false,
@@ -1776,7 +1776,7 @@
     "approval": {
       "seed": {
         "ok": true,
-        "revision": 16,
+        "revision": 17,
         "status": "attention",
         "variant": "approval",
         "nativePresentation": "attentionInteractive",
@@ -1800,17 +1800,17 @@
         "trackingAreaCount": 1,
         "contentSafeViewport": {
           "y": 25,
-          "x": 48,
-          "width": 301,
+          "x": 22,
+          "width": 353,
           "height": 51
         },
         "denyButtonFrame": {
           "y": 84,
-          "x": 48,
-          "width": 123,
+          "x": 22,
+          "width": 144,
           "height": 28
         },
-        "environmentState": "backgrounded",
+        "environmentState": "available",
         "peekContainerVisible": false,
         "notchGeometry": {
           "trailingX": 848,
@@ -1822,8 +1822,8 @@
         "localMonitorInstalled": true,
         "pendingMessageFrame": {
           "y": 22,
-          "x": 48,
-          "width": 301,
+          "x": 22,
+          "width": 353,
           "height": 28
         },
         "pendingMessage": "This will execute the repository's graph acceptance tests and update the local evidence artifacts.",
@@ -1843,18 +1843,18 @@
         "interactiveContentVisible": true,
         "transitionInFlight": false,
         "silhouetteMetrics": {
-          "topLeftX": 40,
-          "topRightX": 357,
+          "topLeftX": 6,
+          "topRightX": 391,
           "bodyDepth": 139,
-          "shoulderFlare": 40,
-          "contentSafeInsetX": 48,
-          "effShoulderR": 40,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 198.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 40,
+          "cachedEffShoulderR": 6,
           "panelWidth": 397,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 40,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "lastHapticReason": "none",
@@ -1862,14 +1862,14 @@
         "approveButtonTitle": "Approve",
         "statusBadgeFrame": {
           "y": 6,
-          "x": 290.6303656697273,
+          "x": 316.6303656697273,
           "width": 58.369634330272675,
           "height": 16
         },
         "semanticContentSubtree": "expandedContainer",
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 62652,
+        "windowNumber": 64974,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 25,
@@ -1888,12 +1888,12 @@
         "approveButtonAlpha": 1,
         "inactiveSubtreesSuppressed": true,
         "renderedPeekBody": "",
-        "revision": 16,
+        "revision": 17,
         "hoverSessionToken": 4,
         "shapeMaskSynced": true,
         "displayMode": "builtin",
         "composerFrame": null,
-        "buildFingerprint": "native-vSep  8 2026-23:25:08",
+        "buildFingerprint": "native-vSep  9 2026-13:59:50",
         "screenLocalizedName": "Built-in Retina Display",
         "pendingMessageFullyVisible": true,
         "accessibilityRole": "AXGroup",
@@ -1923,7 +1923,7 @@
           "height": 32
         },
         "actionFrames": [],
-        "buildTimestamp": "Sep  8 2026 23:25:08",
+        "buildTimestamp": "Sep  9 2026 13:59:50",
         "auxiliaryTopLeftArea": {
           "y": 950,
           "x": 0,
@@ -1977,8 +1977,8 @@
         "contentDocumentHeight": 57,
         "approveButtonFrame": {
           "y": 84,
-          "x": 179,
-          "width": 170,
+          "x": 174,
+          "width": 201,
           "height": 28
         },
         "layerBacked": true,
@@ -1986,18 +1986,18 @@
         "interactionId": "visual-approval-1",
         "orderFrontCount": 1,
         "shoulderMetrics": {
-          "topLeftX": 40,
-          "topRightX": 357,
+          "topLeftX": 6,
+          "topRightX": 391,
           "bodyDepth": 139,
-          "shoulderFlare": 40,
-          "contentSafeInsetX": 48,
-          "effShoulderR": 40,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 198.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 40,
+          "cachedEffShoulderR": 6,
           "panelWidth": 397,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 40,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "panelTopY": 982,
@@ -2006,7 +2006,7 @@
         "optionButtonsVisible": false,
         "supportingChromeSubtree": null,
         "approveButtonAccessibilityLabel": "Approve",
-        "lastRenderedRevision": 16,
+        "lastRenderedRevision": 17,
         "inactiveInteractiveSubtreeSuppressed": true,
         "contentScrollEnabled": true,
         "contentPopulated": true,
@@ -2021,11 +2021,11 @@
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
         "canonicalPresentationState": "interactiveApproval",
-        "contentRefreshCount": 30,
+        "contentRefreshCount": 31,
         "pendingTitleFrame": {
           "y": 2,
-          "x": 48,
-          "width": 301,
+          "x": 22,
+          "width": 353,
           "height": 17
         },
         "geometryTransitionCount": 17,
@@ -2034,11 +2034,11 @@
         "pinButtonVisible": false,
         "headerFrame": {
           "y": 6,
-          "x": 48,
-          "width": 234.63036566972733,
+          "x": 22,
+          "width": 286.6303656697273,
           "height": 16
         },
-        "contentOnlyUpdateCount": 7,
+        "contentOnlyUpdateCount": 8,
         "contentViewport": {
           "y": 25,
           "x": 0,
@@ -2051,7 +2051,7 @@
         "retainedWorkScreen": false,
         "notchDetected": true,
         "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-        "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+        "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
       },
       "screenshot": {
         "captured": false,
@@ -2070,7 +2070,7 @@
     "long": {
       "seed": {
         "ok": true,
-        "revision": 17,
+        "revision": 18,
         "status": "working",
         "variant": "long",
         "nativePresentation": "pinned",
@@ -2094,12 +2094,12 @@
         "trackingAreaCount": 1,
         "contentSafeViewport": {
           "y": 25,
-          "x": 48,
-          "width": 253,
+          "x": 22,
+          "width": 305,
           "height": 98
         },
         "denyButtonFrame": null,
-        "environmentState": "backgrounded",
+        "environmentState": "available",
         "peekContainerVisible": false,
         "notchGeometry": {
           "trailingX": 848,
@@ -2123,8 +2123,8 @@
         "bandHeight": 34,
         "activityFrame": {
           "y": 2,
-          "x": 48,
-          "width": 253,
+          "x": 22,
+          "width": 305,
           "height": 28
         },
         "panelVisible": true,
@@ -2132,18 +2132,18 @@
         "interactiveContentVisible": true,
         "transitionInFlight": false,
         "silhouetteMetrics": {
-          "topLeftX": 40,
-          "topRightX": 309,
+          "topLeftX": 6,
+          "topRightX": 343,
           "bodyDepth": 186,
-          "shoulderFlare": 40,
-          "contentSafeInsetX": 48,
-          "effShoulderR": 40,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 174.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 40,
+          "cachedEffShoulderR": 6,
           "panelWidth": 349,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 40,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "lastHapticReason": "none",
@@ -2151,17 +2151,17 @@
         "approveButtonTitle": "Approve",
         "statusBadgeFrame": {
           "y": 6,
-          "x": 257,
+          "x": 283,
           "width": 44,
           "height": 16
         },
         "semanticContentSubtree": "expandedContainer",
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 62652,
+        "windowNumber": 64974,
         "openButtonFrame": {
           "y": 131,
-          "x": 273,
+          "x": 299,
           "width": 28,
           "height": 28
         },
@@ -2182,17 +2182,17 @@
         "approveButtonAlpha": 1,
         "inactiveSubtreesSuppressed": true,
         "renderedPeekBody": "",
-        "revision": 17,
+        "revision": 18,
         "hoverSessionToken": 4,
         "shapeMaskSynced": true,
         "displayMode": "builtin",
         "composerFrame": {
           "y": 131,
-          "x": 48,
-          "width": 185,
+          "x": 22,
+          "width": 237,
           "height": 28
         },
-        "buildFingerprint": "native-vSep  8 2026-23:25:08",
+        "buildFingerprint": "native-vSep  9 2026-13:59:50",
         "screenLocalizedName": "Built-in Retina Display",
         "pendingMessageFullyVisible": true,
         "accessibilityRole": "AXGroup",
@@ -2224,24 +2224,24 @@
         "actionFrames": [
           {
             "y": 33,
-            "x": 50,
-            "width": 251,
+            "x": 24,
+            "width": 303,
             "height": 15
           },
           {
             "y": 51,
-            "x": 50,
-            "width": 251,
+            "x": 24,
+            "width": 303,
             "height": 15
           },
           {
             "y": 69,
-            "x": 50,
-            "width": 251,
+            "x": 24,
+            "width": 303,
             "height": 15
           }
         ],
-        "buildTimestamp": "Sep  8 2026 23:25:08",
+        "buildTimestamp": "Sep  9 2026 13:59:50",
         "auxiliaryTopLeftArea": {
           "y": 950,
           "x": 0,
@@ -2299,24 +2299,24 @@
         "interactionId": "",
         "orderFrontCount": 1,
         "shoulderMetrics": {
-          "topLeftX": 40,
-          "topRightX": 309,
+          "topLeftX": 6,
+          "topRightX": 343,
           "bodyDepth": 186,
-          "shoulderFlare": 40,
-          "contentSafeInsetX": 48,
-          "effShoulderR": 40,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 174.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 40,
+          "cachedEffShoulderR": 6,
           "panelWidth": 349,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 40,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "panelTopY": 982,
         "pinButtonFrame": {
           "y": 131,
-          "x": 239,
+          "x": 265,
           "width": 28,
           "height": 28
         },
@@ -2324,7 +2324,7 @@
         "optionButtonsVisible": false,
         "supportingChromeSubtree": null,
         "approveButtonAccessibilityLabel": "Approve",
-        "lastRenderedRevision": 17,
+        "lastRenderedRevision": 18,
         "inactiveInteractiveSubtreeSuppressed": true,
         "contentScrollEnabled": true,
         "contentPopulated": true,
@@ -2343,7 +2343,7 @@
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
         "canonicalPresentationState": "interactiveWorking",
-        "contentRefreshCount": 33,
+        "contentRefreshCount": 34,
         "pendingTitleFrame": null,
         "geometryTransitionCount": 19,
         "peekContainerAlpha": 0,
@@ -2351,11 +2351,11 @@
         "pinButtonVisible": true,
         "headerFrame": {
           "y": 6,
-          "x": 48,
-          "width": 201,
+          "x": 22,
+          "width": 253,
           "height": 16
         },
-        "contentOnlyUpdateCount": 7,
+        "contentOnlyUpdateCount": 8,
         "contentViewport": {
           "y": 25,
           "x": 0,
@@ -2368,7 +2368,7 @@
         "retainedWorkScreen": false,
         "notchDetected": true,
         "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-        "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+        "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
       },
       "screenshot": {
         "captured": false,
@@ -2387,7 +2387,7 @@
     "attentionPeek": {
       "seed": {
         "ok": true,
-        "revision": 18,
+        "revision": 19,
         "status": "attention",
         "variant": "question",
         "nativePresentation": "attentionPeek",
@@ -2407,7 +2407,7 @@
         "denyButtonAlpha": 1,
         "openButtonTitle": "Open in PreBase",
         "actualVisibleViewportBottom": 24,
-        "environmentState": "backgrounded",
+        "environmentState": "available",
         "trackingAreaCount": 1,
         "contentSafeViewport": {
           "y": 6,
@@ -2443,18 +2443,18 @@
         "interactiveContentVisible": false,
         "transitionInFlight": false,
         "silhouetteMetrics": {
-          "topLeftX": 22,
-          "topRightX": 291,
+          "topLeftX": 6,
+          "topRightX": 307,
           "bodyDepth": 32,
-          "shoulderFlare": 22,
-          "contentSafeInsetX": 30,
-          "effShoulderR": 22,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 156.5,
           "nonDegenerateShoulder": true,
           "cachedEffShoulderR": 6,
           "panelWidth": 313,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 22,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "lastHapticReason": "none",
@@ -2464,7 +2464,7 @@
         "semanticContentSubtree": "peekContainer",
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 62652,
+        "windowNumber": 64974,
         "openButtonFrame": null,
         "displayMode": "builtin",
         "collapsedHit": {
@@ -2478,10 +2478,10 @@
         "approveButtonAlpha": 1,
         "inactiveSubtreesSuppressed": true,
         "renderedPeekBody": "Magnus needs an answer",
-        "revision": 18,
+        "revision": 19,
         "hoverSessionToken": 4,
         "shapeMaskSynced": true,
-        "buildFingerprint": "native-vSep  8 2026-23:25:08",
+        "buildFingerprint": "native-vSep  9 2026-13:59:50",
         "composerFrame": null,
         "screenLocalizedName": "Built-in Retina Display",
         "pendingMessageFullyVisible": true,
@@ -2512,7 +2512,7 @@
           "height": 32
         },
         "actionFrames": [],
-        "buildTimestamp": "Sep  8 2026 23:25:08",
+        "buildTimestamp": "Sep  9 2026 13:59:50",
         "auxiliaryTopLeftArea": {
           "y": 950,
           "x": 0,
@@ -2569,18 +2569,18 @@
         "interactionId": "visual-question-1",
         "orderFrontCount": 1,
         "shoulderMetrics": {
-          "topLeftX": 22,
-          "topRightX": 291,
+          "topLeftX": 6,
+          "topRightX": 307,
           "bodyDepth": 32,
-          "shoulderFlare": 22,
-          "contentSafeInsetX": 30,
-          "effShoulderR": 22,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 156.5,
           "nonDegenerateShoulder": true,
           "cachedEffShoulderR": 6,
           "panelWidth": 313,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 22,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "panelTopY": 982,
@@ -2589,7 +2589,7 @@
         "optionButtonsVisible": false,
         "supportingChromeSubtree": "compactContainer",
         "approveButtonAccessibilityLabel": "Approve",
-        "lastRenderedRevision": 18,
+        "lastRenderedRevision": 19,
         "inactiveInteractiveSubtreeSuppressed": true,
         "contentScrollEnabled": false,
         "contentPopulated": true,
@@ -2609,14 +2609,14 @@
           "height": 16
         },
         "canonicalPresentationState": "attentionPeek",
-        "contentRefreshCount": 37,
+        "contentRefreshCount": 38,
         "pendingTitleFrame": null,
         "geometryTransitionCount": 21,
         "peekContainerAlpha": 1,
         "peekLabelVisible": true,
         "pinButtonVisible": false,
         "headerFrame": null,
-        "contentOnlyUpdateCount": 8,
+        "contentOnlyUpdateCount": 9,
         "contentViewport": {
           "y": 0,
           "x": 0,
@@ -2629,7 +2629,7 @@
         "retainedWorkScreen": false,
         "notchDetected": true,
         "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-        "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+        "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
       },
       "screenshot": {
         "captured": false,
@@ -2648,7 +2648,7 @@
     "completed": {
       "seed": {
         "ok": true,
-        "revision": 19,
+        "revision": 20,
         "status": "completed",
         "variant": "completed",
         "nativePresentation": "pinned",
@@ -2672,12 +2672,12 @@
         "trackingAreaCount": 1,
         "contentSafeViewport": {
           "y": 25,
-          "x": 30,
-          "width": 289,
+          "x": 22,
+          "width": 305,
           "height": 19
         },
         "denyButtonFrame": null,
-        "environmentState": "backgrounded",
+        "environmentState": "available",
         "peekContainerVisible": false,
         "notchGeometry": {
           "trailingX": 848,
@@ -2701,8 +2701,8 @@
         "bandHeight": 34,
         "activityFrame": {
           "y": 2,
-          "x": 30,
-          "width": 289,
+          "x": 22,
+          "width": 305,
           "height": 15
         },
         "panelVisible": true,
@@ -2710,18 +2710,18 @@
         "interactiveContentVisible": true,
         "transitionInFlight": false,
         "silhouetteMetrics": {
-          "topLeftX": 22,
-          "topRightX": 327,
+          "topLeftX": 6,
+          "topRightX": 343,
           "bodyDepth": 52,
-          "shoulderFlare": 22,
-          "contentSafeInsetX": 30,
-          "effShoulderR": 22,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 174.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 22,
+          "cachedEffShoulderR": 6,
           "panelWidth": 349,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 22,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "lastHapticReason": "none",
@@ -2729,14 +2729,14 @@
         "approveButtonTitle": "Approve",
         "statusBadgeFrame": {
           "y": 6,
-          "x": 275,
+          "x": 283,
           "width": 44,
           "height": 16
         },
         "semanticContentSubtree": "expandedContainer",
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 62652,
+        "windowNumber": 64974,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 25,
@@ -2755,12 +2755,12 @@
         "approveButtonAlpha": 1,
         "inactiveSubtreesSuppressed": true,
         "renderedPeekBody": "",
-        "revision": 19,
+        "revision": 20,
         "hoverSessionToken": 4,
         "shapeMaskSynced": true,
         "displayMode": "builtin",
         "composerFrame": null,
-        "buildFingerprint": "native-vSep  8 2026-23:25:08",
+        "buildFingerprint": "native-vSep  9 2026-13:59:50",
         "screenLocalizedName": "Built-in Retina Display",
         "pendingMessageFullyVisible": true,
         "accessibilityRole": "AXGroup",
@@ -2792,24 +2792,24 @@
         "actionFrames": [
           {
             "y": 20,
-            "x": 32,
-            "width": 287,
+            "x": 24,
+            "width": 303,
             "height": 15
           },
           {
             "y": 38,
-            "x": 32,
-            "width": 287,
+            "x": 24,
+            "width": 303,
             "height": 15
           },
           {
             "y": 56,
-            "x": 32,
-            "width": 287,
+            "x": 24,
+            "width": 303,
             "height": 15
           }
         ],
-        "buildTimestamp": "Sep  8 2026 23:25:08",
+        "buildTimestamp": "Sep  9 2026 13:59:50",
         "auxiliaryTopLeftArea": {
           "y": 950,
           "x": 0,
@@ -2867,18 +2867,18 @@
         "interactionId": "",
         "orderFrontCount": 1,
         "shoulderMetrics": {
-          "topLeftX": 22,
-          "topRightX": 327,
+          "topLeftX": 6,
+          "topRightX": 343,
           "bodyDepth": 52,
-          "shoulderFlare": 22,
-          "contentSafeInsetX": 30,
-          "effShoulderR": 22,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 174.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 22,
+          "cachedEffShoulderR": 6,
           "panelWidth": 349,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 22,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "panelTopY": 982,
@@ -2887,7 +2887,7 @@
         "optionButtonsVisible": false,
         "supportingChromeSubtree": null,
         "approveButtonAccessibilityLabel": "Approve",
-        "lastRenderedRevision": 19,
+        "lastRenderedRevision": 20,
         "inactiveInteractiveSubtreeSuppressed": true,
         "contentScrollEnabled": true,
         "contentPopulated": true,
@@ -2906,7 +2906,7 @@
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
         "canonicalPresentationState": "terminalCompleted",
-        "contentRefreshCount": 41,
+        "contentRefreshCount": 42,
         "pendingTitleFrame": null,
         "geometryTransitionCount": 24,
         "peekContainerAlpha": 0,
@@ -2914,11 +2914,11 @@
         "pinButtonVisible": false,
         "headerFrame": {
           "y": 6,
-          "x": 30,
-          "width": 237,
+          "x": 22,
+          "width": 253,
           "height": 16
         },
-        "contentOnlyUpdateCount": 8,
+        "contentOnlyUpdateCount": 9,
         "contentViewport": {
           "y": 25,
           "x": 0,
@@ -2931,7 +2931,7 @@
         "retainedWorkScreen": false,
         "notchDetected": true,
         "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-        "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+        "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
       },
       "screenshot": {
         "captured": false,
@@ -2950,7 +2950,7 @@
     "failed": {
       "seed": {
         "ok": true,
-        "revision": 20,
+        "revision": 21,
         "status": "failed",
         "variant": "failed",
         "nativePresentation": "pinned",
@@ -2974,12 +2974,12 @@
         "trackingAreaCount": 1,
         "contentSafeViewport": {
           "y": 25,
-          "x": 30,
-          "width": 289,
+          "x": 22,
+          "width": 305,
           "height": 19
         },
         "denyButtonFrame": null,
-        "environmentState": "backgrounded",
+        "environmentState": "available",
         "peekContainerVisible": false,
         "notchGeometry": {
           "trailingX": 848,
@@ -3003,8 +3003,8 @@
         "bandHeight": 34,
         "activityFrame": {
           "y": 2,
-          "x": 30,
-          "width": 289,
+          "x": 22,
+          "width": 305,
           "height": 15
         },
         "panelVisible": true,
@@ -3012,18 +3012,18 @@
         "interactiveContentVisible": true,
         "transitionInFlight": false,
         "silhouetteMetrics": {
-          "topLeftX": 22,
-          "topRightX": 327,
+          "topLeftX": 6,
+          "topRightX": 343,
           "bodyDepth": 52,
-          "shoulderFlare": 22,
-          "contentSafeInsetX": 30,
-          "effShoulderR": 22,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 174.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 22,
+          "cachedEffShoulderR": 6,
           "panelWidth": 349,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 22,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "lastHapticReason": "none",
@@ -3031,14 +3031,14 @@
         "approveButtonTitle": "Approve",
         "statusBadgeFrame": {
           "y": 6,
-          "x": 275,
+          "x": 283,
           "width": 44,
           "height": 16
         },
         "semanticContentSubtree": "expandedContainer",
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 62652,
+        "windowNumber": 64974,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 25,
@@ -3057,12 +3057,12 @@
         "approveButtonAlpha": 1,
         "inactiveSubtreesSuppressed": true,
         "renderedPeekBody": "",
-        "revision": 20,
+        "revision": 21,
         "hoverSessionToken": 4,
         "shapeMaskSynced": true,
         "displayMode": "builtin",
         "composerFrame": null,
-        "buildFingerprint": "native-vSep  8 2026-23:25:08",
+        "buildFingerprint": "native-vSep  9 2026-13:59:50",
         "screenLocalizedName": "Built-in Retina Display",
         "pendingMessageFullyVisible": true,
         "accessibilityRole": "AXGroup",
@@ -3094,24 +3094,24 @@
         "actionFrames": [
           {
             "y": 20,
-            "x": 32,
-            "width": 287,
+            "x": 24,
+            "width": 303,
             "height": 15
           },
           {
             "y": 38,
-            "x": 32,
-            "width": 287,
+            "x": 24,
+            "width": 303,
             "height": 15
           },
           {
             "y": 56,
-            "x": 32,
-            "width": 287,
+            "x": 24,
+            "width": 303,
             "height": 15
           }
         ],
-        "buildTimestamp": "Sep  8 2026 23:25:08",
+        "buildTimestamp": "Sep  9 2026 13:59:50",
         "auxiliaryTopLeftArea": {
           "y": 950,
           "x": 0,
@@ -3169,18 +3169,18 @@
         "interactionId": "",
         "orderFrontCount": 1,
         "shoulderMetrics": {
-          "topLeftX": 22,
-          "topRightX": 327,
+          "topLeftX": 6,
+          "topRightX": 343,
           "bodyDepth": 52,
-          "shoulderFlare": 22,
-          "contentSafeInsetX": 30,
-          "effShoulderR": 22,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 174.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 22,
+          "cachedEffShoulderR": 6,
           "panelWidth": 349,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 22,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "panelTopY": 982,
@@ -3189,7 +3189,7 @@
         "optionButtonsVisible": false,
         "supportingChromeSubtree": null,
         "approveButtonAccessibilityLabel": "Approve",
-        "lastRenderedRevision": 20,
+        "lastRenderedRevision": 21,
         "inactiveInteractiveSubtreeSuppressed": true,
         "contentScrollEnabled": true,
         "contentPopulated": true,
@@ -3208,7 +3208,7 @@
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
         "canonicalPresentationState": "terminalFailed",
-        "contentRefreshCount": 43,
+        "contentRefreshCount": 44,
         "pendingTitleFrame": null,
         "geometryTransitionCount": 26,
         "peekContainerAlpha": 0,
@@ -3216,11 +3216,11 @@
         "pinButtonVisible": false,
         "headerFrame": {
           "y": 6,
-          "x": 30,
-          "width": 237,
+          "x": 22,
+          "width": 253,
           "height": 16
         },
-        "contentOnlyUpdateCount": 8,
+        "contentOnlyUpdateCount": 9,
         "contentViewport": {
           "y": 25,
           "x": 0,
@@ -3233,7 +3233,7 @@
         "retainedWorkScreen": false,
         "notchDetected": true,
         "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-        "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+        "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
       },
       "screenshot": {
         "captured": false,
@@ -3252,7 +3252,7 @@
     "inFlight": {
       "seed": {
         "ok": true,
-        "revision": 21,
+        "revision": 22,
         "status": "attention",
         "variant": "approval",
         "nativePresentation": "attentionInteractive",
@@ -3276,17 +3276,17 @@
         "trackingAreaCount": 1,
         "contentSafeViewport": {
           "y": 25,
-          "x": 48,
-          "width": 301,
+          "x": 22,
+          "width": 353,
           "height": 51
         },
         "denyButtonFrame": {
           "y": 84,
-          "x": 48,
-          "width": 123,
+          "x": 22,
+          "width": 144,
           "height": 28
         },
-        "environmentState": "backgrounded",
+        "environmentState": "available",
         "peekContainerVisible": false,
         "notchGeometry": {
           "trailingX": 848,
@@ -3298,8 +3298,8 @@
         "localMonitorInstalled": true,
         "pendingMessageFrame": {
           "y": 22,
-          "x": 48,
-          "width": 301,
+          "x": 22,
+          "width": 353,
           "height": 28
         },
         "pendingMessage": "This will execute the repository's graph acceptance tests and update the local evidence artifacts.",
@@ -3319,18 +3319,18 @@
         "interactiveContentVisible": true,
         "transitionInFlight": false,
         "silhouetteMetrics": {
-          "topLeftX": 40,
-          "topRightX": 357,
+          "topLeftX": 6,
+          "topRightX": 391,
           "bodyDepth": 139,
-          "shoulderFlare": 40,
-          "contentSafeInsetX": 48,
-          "effShoulderR": 40,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 198.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 40,
+          "cachedEffShoulderR": 6,
           "panelWidth": 397,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 40,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "lastHapticReason": "none",
@@ -3338,14 +3338,14 @@
         "approveButtonTitle": "Approve",
         "statusBadgeFrame": {
           "y": 6,
-          "x": 290.6303656697273,
+          "x": 316.6303656697273,
           "width": 58.369634330272675,
           "height": 16
         },
         "semanticContentSubtree": "expandedContainer",
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 62652,
+        "windowNumber": 64974,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 25,
@@ -3364,12 +3364,12 @@
         "approveButtonAlpha": 0.55,
         "inactiveSubtreesSuppressed": true,
         "renderedPeekBody": "",
-        "revision": 21,
+        "revision": 22,
         "hoverSessionToken": 4,
         "shapeMaskSynced": true,
         "displayMode": "builtin",
         "composerFrame": null,
-        "buildFingerprint": "native-vSep  8 2026-23:25:08",
+        "buildFingerprint": "native-vSep  9 2026-13:59:50",
         "screenLocalizedName": "Built-in Retina Display",
         "pendingMessageFullyVisible": true,
         "accessibilityRole": "AXGroup",
@@ -3399,7 +3399,7 @@
           "height": 32
         },
         "actionFrames": [],
-        "buildTimestamp": "Sep  8 2026 23:25:08",
+        "buildTimestamp": "Sep  9 2026 13:59:50",
         "auxiliaryTopLeftArea": {
           "y": 950,
           "x": 0,
@@ -3453,8 +3453,8 @@
         "contentDocumentHeight": 57,
         "approveButtonFrame": {
           "y": 84,
-          "x": 179,
-          "width": 170,
+          "x": 174,
+          "width": 201,
           "height": 28
         },
         "layerBacked": true,
@@ -3462,18 +3462,18 @@
         "interactionId": "visual-approval-1",
         "orderFrontCount": 1,
         "shoulderMetrics": {
-          "topLeftX": 40,
-          "topRightX": 357,
+          "topLeftX": 6,
+          "topRightX": 391,
           "bodyDepth": 139,
-          "shoulderFlare": 40,
-          "contentSafeInsetX": 48,
-          "effShoulderR": 40,
+          "shoulderFlare": 6,
+          "contentSafeInsetX": 22,
+          "effShoulderR": 6,
           "notchCenter": 198.5,
           "nonDegenerateShoulder": true,
-          "cachedEffShoulderR": 40,
+          "cachedEffShoulderR": 6,
           "panelWidth": 397,
           "shoulderCurvatureContinuous": true,
-          "opticalTopInset": 40,
+          "opticalTopInset": 6,
           "tangentContinuity": true
         },
         "panelTopY": 982,
@@ -3482,7 +3482,7 @@
         "optionButtonsVisible": false,
         "supportingChromeSubtree": null,
         "approveButtonAccessibilityLabel": "Approve (in progress)",
-        "lastRenderedRevision": 21,
+        "lastRenderedRevision": 22,
         "inactiveInteractiveSubtreeSuppressed": true,
         "contentScrollEnabled": true,
         "contentPopulated": true,
@@ -3497,11 +3497,11 @@
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
         "canonicalPresentationState": "interactiveApproval",
-        "contentRefreshCount": 46,
+        "contentRefreshCount": 47,
         "pendingTitleFrame": {
           "y": 2,
-          "x": 48,
-          "width": 301,
+          "x": 22,
+          "width": 353,
           "height": 17
         },
         "geometryTransitionCount": 28,
@@ -3510,11 +3510,11 @@
         "pinButtonVisible": false,
         "headerFrame": {
           "y": 6,
-          "x": 48,
-          "width": 234.63036566972733,
+          "x": 22,
+          "width": 286.6303656697273,
           "height": 16
         },
-        "contentOnlyUpdateCount": 8,
+        "contentOnlyUpdateCount": 9,
         "contentViewport": {
           "y": 25,
           "x": 0,
@@ -3527,7 +3527,7 @@
         "retainedWorkScreen": false,
         "notchDetected": true,
         "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-        "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+        "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
       },
       "screenshot": {
         "captured": false,
@@ -3550,9 +3550,9 @@
   },
   "blurredDiagnostics": {
     "backend": "native-appkit",
-    "revision": 24,
-    "sessionId": "5d2f1568-511a-4725-b8a2-652087c85121",
-    "sessionResource": "vscode-chat-session://local/NWQyZjE1NjgtNTExYS00NzI1LWI4YTItNjUyMDg3Yzg1MTIx",
+    "revision": 26,
+    "sessionId": "4310c47c-fb9c-4902-82cd-cdedac2bc5ab",
+    "sessionResource": "vscode-chat-session://local/NDMxMGM0N2MtZmI5Yy00OTAyLTgyY2QtY2RlZGFjMmJjNWFi",
     "status": "attention",
     "visible": true,
     "pendingKind": "question",
@@ -3577,12 +3577,12 @@
       "trackingAreaCount": 1,
       "contentSafeViewport": {
         "y": 25,
-        "x": 45.8,
-        "width": 305.4,
+        "x": 22,
+        "width": 353,
         "height": 38
       },
       "denyButtonFrame": null,
-      "environmentState": "backgrounded",
+      "environmentState": "available",
       "peekContainerVisible": false,
       "notchGeometry": {
         "trailingX": 848,
@@ -3594,8 +3594,8 @@
       "localMonitorInstalled": true,
       "pendingMessageFrame": {
         "y": 22,
-        "x": 45.8,
-        "width": 305.4,
+        "x": 22,
+        "width": 353,
         "height": 15
       },
       "pendingMessage": "Live Activity smoke question?",
@@ -3615,18 +3615,18 @@
       "interactiveContentVisible": true,
       "transitionInFlight": false,
       "silhouetteMetrics": {
-        "topLeftX": 37.8,
-        "topRightX": 359.2,
+        "topLeftX": 6,
+        "topRightX": 391,
         "bodyDepth": 126,
-        "shoulderFlare": 37.8,
-        "contentSafeInsetX": 45.8,
-        "effShoulderR": 37.8,
+        "shoulderFlare": 6,
+        "contentSafeInsetX": 22,
+        "effShoulderR": 6,
         "notchCenter": 198.5,
         "nonDegenerateShoulder": true,
-        "cachedEffShoulderR": 37.8,
+        "cachedEffShoulderR": 6,
         "panelWidth": 397,
         "shoulderCurvatureContinuous": true,
-        "opticalTopInset": 37.8,
+        "opticalTopInset": 6,
         "tangentContinuity": true
       },
       "lastHapticReason": "none",
@@ -3634,7 +3634,7 @@
       "approveButtonTitle": "Approve",
       "statusBadgeFrame": {
         "y": 6,
-        "x": 300.91462070941924,
+        "x": 324.71462070941925,
         "width": 50.28537929058075,
         "height": 16
       },
@@ -3644,7 +3644,7 @@
         "Option B"
       ],
       "prebaseFullscreen": false,
-      "windowNumber": 62652,
+      "windowNumber": 64974,
       "openButtonFrame": null,
       "contentScrollFrame": {
         "y": 25,
@@ -3663,12 +3663,12 @@
       "approveButtonAlpha": 1,
       "inactiveSubtreesSuppressed": true,
       "renderedPeekBody": "",
-      "revision": 23,
+      "revision": 25,
       "hoverSessionToken": 4,
       "shapeMaskSynced": true,
       "displayMode": "builtin",
       "composerFrame": null,
-      "buildFingerprint": "native-vSep  8 2026-23:25:08",
+      "buildFingerprint": "native-vSep  9 2026-13:59:50",
       "screenLocalizedName": "Built-in Retina Display",
       "pendingMessageFullyVisible": true,
       "accessibilityRole": "AXGroup",
@@ -3698,7 +3698,7 @@
         "height": 32
       },
       "actionFrames": [],
-      "buildTimestamp": "Sep  8 2026 23:25:08",
+      "buildTimestamp": "Sep  9 2026 13:59:50",
       "auxiliaryTopLeftArea": {
         "y": 950,
         "x": 0,
@@ -3711,14 +3711,14 @@
       "optionButtonFrames": [
         {
           "y": 71,
-          "x": 45.8,
-          "width": 149,
+          "x": 22,
+          "width": 173,
           "height": 28
         },
         {
           "y": 71,
-          "x": 200.8,
-          "width": 150.39999999999998,
+          "x": 201,
+          "width": 174,
           "height": 28
         }
       ],
@@ -3756,7 +3756,7 @@
       "approvalControlsVisible": false,
       "actionInFlight": false,
       "screenTopY": 982,
-      "geometrySignature": "e=1;p=0;pin=1;att=1;st=attention;kind=question;id=smoke-la-question-1788925607260:0;opts=2;appr=0;dest=0;acts=3;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+      "geometrySignature": "e=1;p=0;pin=1;att=1;st=attention;kind=question;id=smoke-la-question-1788977871390:0;opts=2;appr=0;dest=0;acts=3;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
       "approveDenyVisible": false,
       "redrawCount": 29,
       "shapeAwareHitTesting": true,
@@ -3766,21 +3766,21 @@
       "approveButtonFrame": null,
       "layerBacked": true,
       "accessibilityLabel": "Question",
-      "interactionId": "smoke-la-question-1788925607260:0",
+      "interactionId": "smoke-la-question-1788977871390:0",
       "orderFrontCount": 1,
       "shoulderMetrics": {
-        "topLeftX": 37.8,
-        "topRightX": 359.2,
+        "topLeftX": 6,
+        "topRightX": 391,
         "bodyDepth": 126,
-        "shoulderFlare": 37.8,
-        "contentSafeInsetX": 45.8,
-        "effShoulderR": 37.8,
+        "shoulderFlare": 6,
+        "contentSafeInsetX": 22,
+        "effShoulderR": 6,
         "notchCenter": 198.5,
         "nonDegenerateShoulder": true,
-        "cachedEffShoulderR": 37.8,
+        "cachedEffShoulderR": 6,
         "panelWidth": 397,
         "shoulderCurvatureContinuous": true,
-        "opticalTopInset": 37.8,
+        "opticalTopInset": 6,
         "tangentContinuity": true
       },
       "panelTopY": 982,
@@ -3789,7 +3789,7 @@
       "optionButtonsVisible": true,
       "supportingChromeSubtree": null,
       "approveButtonAccessibilityLabel": "Approve (in progress)",
-      "lastRenderedRevision": 23,
+      "lastRenderedRevision": 25,
       "inactiveInteractiveSubtreeSuppressed": true,
       "contentScrollEnabled": true,
       "contentPopulated": true,
@@ -3804,11 +3804,11 @@
       "expandedContainerAlpha": 1,
       "peekLabelFrame": null,
       "canonicalPresentationState": "interactiveQuestion",
-      "contentRefreshCount": 49,
+      "contentRefreshCount": 51,
       "pendingTitleFrame": {
         "y": 2,
-        "x": 45.8,
-        "width": 305.4,
+        "x": 22,
+        "width": 353,
         "height": 17
       },
       "geometryTransitionCount": 29,
@@ -3817,11 +3817,11 @@
       "pinButtonVisible": false,
       "headerFrame": {
         "y": 6,
-        "x": 45.8,
-        "width": 247.11462070941923,
+        "x": 22,
+        "width": 294.71462070941925,
         "height": 16
       },
-      "contentOnlyUpdateCount": 9,
+      "contentOnlyUpdateCount": 11,
       "contentViewport": {
         "y": 25,
         "x": 0,
@@ -3834,12 +3834,12 @@
       "retainedWorkScreen": false,
       "notchDetected": true,
       "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-      "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+      "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
     }
   },
   "workbenchDiagnostics": {
-    "parserActiveRequests": 0,
-    "temporalActiveWrites": 2,
+    "parserActiveRequests": 1,
+    "temporalActiveWrites": 1,
     "runtimePreviewServerRunning": false,
     "runtimePreviewStatus": "stopped",
     "desktopSessionState": null,
@@ -3894,23 +3894,23 @@
     }
   },
   "nativeAddonProvenance": {
-    "buildTimestamp": "Sep  8 2026 23:25:08",
+    "buildTimestamp": "Sep  9 2026 13:59:50",
     "buildSourceFile": "../src/live_activity.mm",
-    "buildFingerprint": "native-vSep  8 2026-23:25:08",
+    "buildFingerprint": "native-vSep  9 2026-13:59:50",
     "loadedAddonPath": "/Users/qunyingfan/Prebasecode/native/prebase-live-activity/build/Release/prebase_live_activity.node",
-    "loadedAddonTimestamp": "2026-09-09T03:46:39.258Z"
+    "loadedAddonTimestamp": "2026-09-09T18:17:43.480Z"
   },
   "quit": {
-    "before": "25695     1  11.9 321200 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "43401     1  19.6 314080 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 696,
+    "latencyMs": 685,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,
     "usedSigkill": false
   },
-  "durationMs": 21815,
+  "durationMs": 23135,
   "ok": false,
   "failures": [
     "visual fixture approval panelFrame height (173pt) exceeds limit 165pt"
