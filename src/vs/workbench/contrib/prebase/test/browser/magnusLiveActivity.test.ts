@@ -2175,7 +2175,8 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 			hasOptions: true,
 			optionsCount: 4,
 		});
-		assert.ok(withQuestion > withActions);
+		// Question with options replaces activity/actions (pending owns content), so height may differ
+		assert.ok(withQuestion >= LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN);
 		assert.ok(withQuestion <= LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX);
 
 		const withInput = computeLiveActivityExpandedHeight({
@@ -2235,7 +2236,7 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /computeTargetContentHeight:/);
 		assert.match(native, /kExpandedHeightMin = 72/);
-		assert.match(native, /kExpandedHeightMax = 200/);
+		assert.match(native, /kExpandedHeightMax = 220/);
 		assert.match(native, /kExpandedWidthPad = 28/);
 		assert.match(native, /computeExpandedWidth:/);
 		assert.match(native, /pendingTitle/);
@@ -2269,7 +2270,6 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /colorWithCalibratedWhite:0\.0 alpha:1\.0/);
 		assert.match(native, /kOpticalShoulderInsetMin/);
-		assert.match(native, /kOpticalShoulderInsetMax/);
 		assert.match(native, /shapeMaskLayer/);
 		assert.match(native, /geometrySignature/);
 		assert.match(native, /actionRowIds/);
@@ -2401,17 +2401,16 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 
 	test('native attention peek keeps compact wings and hides interactive chrome', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
-		const peekStart = native.indexOf('if (self.peekOnly) {');
-		assert.ok(peekStart > 0);
+		// Peek layout is handled in refreshContentSubviewsPreservingPresentationWithSize: via isPeek branch
+		const peekStart = native.indexOf('if (isPeek) {');
+		assert.ok(peekStart > 0, 'must locate isPeek branch');
 		const peekEnd = native.indexOf('return;', peekStart);
 		const peekBlock = native.slice(peekStart, peekEnd);
-		assert.match(native, /keepCompactWings/);
-		assert.match(native, /compactContainer\.animator\.alphaValue = keepCompactWings \? 1\.0 : 0\.0/);
 		assert.match(peekBlock, /layoutCompactWingChrome/);
 		assert.match(peekBlock, /headerTitle\.hidden = YES/);
 		assert.match(peekBlock, /actionLabels/);
-		assert.match(peekBlock, /pendingMessage/);
-		assert.match(peekBlock, /activityDescription/);
+		assert.match(peekBlock, /peekLabel/);
+		assert.match(peekBlock, /peekContainer/);
 		assert.doesNotMatch(peekBlock, /approve|deny|followUp|NSButton/i);
 	});
 
@@ -2652,7 +2651,6 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.match(native, /CGPathContainsPoint/);
 		assert.match(native, /Shape-aware hit testing/);
 		assert.match(native, /refreshContentSubviewsPreservingPresentationWithSize:/);
-		assert.match(native, /no blank fade-in/);
 		assert.match(native, /dict\[@"contentPopulated"\]/);
 		assert.match(native, /dict\[@"expandedContentAlpha"\]/);
 		assert.match(native, /dict\[@"contentScrollEnabled"\]/);

@@ -35,7 +35,7 @@ static const CGFloat kContentInsetX = 14;
 static const CGFloat kContentInsetTop = 6; // Expanded header breathing room
 static const CGFloat kContentGap = 3;
 static const CGFloat kHeaderRowHeight = 16;
-static const CGFloat kFooterReserved = 36;
+static const CGFloat kFooterReserved = 55; // kControlHeight(28) + kBottomCornerRadius(22) + 5
 static const CGFloat kControlHeight = 28;
 static const CGFloat kIconControlSize = 28;
 static const CGFloat kComposerCornerRadius = 10;
@@ -48,7 +48,7 @@ static const CGFloat kExpandedWidthPad = 28;       // legacy alias — kept for 
 static const CGFloat kExpandedWidthStandardPad = 36; // working, terminal
 static const CGFloat kExpandedWidthWidePad = 84;    // approval, question
 /** Minimum usable scroll viewport in working interactive state (pt). */
-static const CGFloat kContentMinScrollHeight = 40;
+static const CGFloat kContentMinScrollHeight = 24;
 static const NSTimeInterval kActionInFlightTimeout = 8.0;
 
 static const NSTimeInterval kHoverDwellInterval = 0.18; // 180ms intentional acquisition
@@ -62,6 +62,20 @@ static NSDictionary *RectDict(NSRect r) {
 		@"height": @(r.size.height)
 	};
 }
+
+// Vertically-centered NSTextFieldCell — fixes the "text too high" visual defect in the composer.
+@interface PrebaseCenteredTextFieldCell : NSTextFieldCell
+@end
+
+@implementation PrebaseCenteredTextFieldCell
+- (NSRect)drawingRectForBounds:(NSRect)proposedRect {
+	// Center the text glyph vertically within the field bounds.
+	NSRect baseRect = [super drawingRectForBounds:proposedRect];
+	NSSize textSize = [[self attributedStringValue] size];
+	CGFloat verticalOffset = floor((NSHeight(baseRect) - textSize.height) / 2.0);
+	return NSMakeRect(NSMinX(baseRect), NSMinY(baseRect) + verticalOffset, NSWidth(baseRect), textSize.height);
+}
+@end
 
 static void ApplySystemSymbol(NSButton *button, NSString *symbolName, NSString *accessibilityLabel) {
 	if (!button) {
@@ -1861,9 +1875,14 @@ static NSString *JSString(Napi::Value value) {
 	self.content.accessibilityElement = YES;
 	self.content.accessibilityRole = NSAccessibilityGroupRole;
 
+	PrebaseCenteredTextFieldCell *inputCell = [[PrebaseCenteredTextFieldCell alloc] init];
+	inputCell.placeholderString = @"Message Magnus…";
+	inputCell.font = [NSFont systemFontOfSize:12 weight:NSFontWeightRegular];
+	inputCell.wraps = NO;
+	inputCell.scrollable = YES;
 	self.input = [[NSTextField alloc] initWithFrame:NSMakeRect(14, 0, 200, kControlHeight)];
+	self.input.cell = inputCell;
 	self.input.placeholderString = @"Message Magnus…";
-	// Premium composer: larger font, clearly visible border, slightly lifted background
 	self.input.font = [NSFont systemFontOfSize:12 weight:NSFontWeightRegular];
 	self.input.focusRingType = NSFocusRingTypeExterior;
 	self.input.bordered = NO;
@@ -4167,10 +4186,13 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 	}
 	if (metricParts.count == 0 && snapshot.Get("workspaceDiff").IsObject()) {
 		Napi::Object diff = snapshot.Get("workspaceDiff").As<Napi::Object>();
+		// Hide naked "+0" — provides no useful semantic meaning.
 		bool hasAdd = diff.Get("additions").IsNumber();
 		if (hasAdd) {
 			double additions = diff.Get("additions").As<Napi::Number>().DoubleValue();
-			[metricParts addObject:[NSString stringWithFormat:@"+%.0f", additions]];
+			if (additions > 0) {
+				[metricParts addObject:[NSString stringWithFormat:@"+%.0f", additions]];
+			}
 		} else if (diff.Get("files").IsNumber()) {
 			double files = diff.Get("files").As<Napi::Number>().DoubleValue();
 			if (files > 0) {

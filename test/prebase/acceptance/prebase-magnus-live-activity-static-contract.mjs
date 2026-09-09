@@ -218,10 +218,10 @@ if (!native.includes('emit:@"dismissAttention"')) {
 			|| !/kExpandedWidthPad = 28/.test(native)
 			|| !/kExpandedWidthStandardPad = 36/.test(native)
 			|| !/kExpandedWidthWidePad = 84/.test(native)
-			|| !/kContentMinScrollHeight = 40/.test(native)
+			|| !/kContentMinScrollHeight = 24/.test(native)
 			|| !/kStableCompactLeftWing = 64/.test(native)
 			|| !/kStableCompactRightWing = 64/.test(native)) {
-			failures.push('native geometry constants must be: min=72 max=200 widthPad=28(alias) standardPad=36 widePad=84 minScroll=40 wings=64');
+			failures.push('native geometry constants must be: min=72 max=220 widthPad=28(alias) standardPad=36 widePad=84 minScroll=24 wings=64');
 		}
 		if (!/LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 72/.test(magnusCommon)
 			|| !/LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 220/.test(magnusCommon)

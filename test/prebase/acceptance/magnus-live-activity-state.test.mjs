@@ -297,7 +297,7 @@ test('native source keeps natural expanded width + truthful Approve/Deny in-flig
 	assert.match(native, /kExpandedWidthPad = 28/);
 	assert.match(native, /kExpandedWidthStandardPad = 36/);
 	assert.match(native, /kExpandedWidthWidePad = 84/);
-	assert.match(native, /kContentMinScrollHeight = 40/);
+	assert.match(native, /kContentMinScrollHeight = 24/);
 	assert.match(native, /kStableCompactLeftWing = 64/);
 	assert.match(native, /computeExpandedWidth:/);
 	// New bucket strategy: approval+question always use WIDE bucket, not per-option-count
@@ -554,9 +554,9 @@ test('minimum scroll viewport floor: working interactive cannot be capped to ~16
 	// Check: no standalone code use of MIN(114 (comment OK, actual h = MIN(114, ...) not OK)
 	assert.doesNotMatch(native, /\n\t*h = MIN\(114/,
 		'h = MIN(114, ...) must not exist in code — it created ~16pt usable viewport, blocking real content display');
-	// New floor: kContentMinScrollHeight = 40
-	assert.match(native, /kContentMinScrollHeight = 40/,
-		'minimum scroll height constant must be defined at 40pt');
+	// New floor: kContentMinScrollHeight = 24
+	assert.match(native, /kContentMinScrollHeight = 24/,
+		'minimum scroll height constant must be defined at 24pt');
 	// Floor is applied in computeTargetContentHeight
 	assert.match(native, /Enforce minimum usable scroll viewport/,
 		'minimum viewport enforcement comment must exist in computeTargetContentHeight');
