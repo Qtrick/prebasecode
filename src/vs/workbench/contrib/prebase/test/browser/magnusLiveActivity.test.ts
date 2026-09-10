@@ -350,9 +350,9 @@ suite('Magnus Live Activity projection', () => {
 		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'dismissAttention', revision: 1 }), { ok: true });
 	});
 
-	test('background mode hides when PreBase is focused', () => {
+	test('background mode shows working sessions even when PreBase is focused (quick messaging)', () => {
 		const working = buildMagnusLiveActivitySnapshot(session(), { revision: 1, prebaseForeground: true, connected: true });
-		assert.strictEqual(shouldShowLiveActivity('background', working), false);
+		assert.strictEqual(shouldShowLiveActivity('background', working), true, 'background mode shows working sessions for quick messaging');
 		const backgrounded = buildMagnusLiveActivitySnapshot(session(), { revision: 2, prebaseForeground: false, connected: true });
 		assert.strictEqual(shouldShowLiveActivity('background', backgrounded), true);
 		assert.strictEqual(shouldShowLiveActivity('off', backgrounded), false);

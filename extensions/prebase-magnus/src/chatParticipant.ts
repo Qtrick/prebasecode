@@ -484,10 +484,37 @@ async function handleChatRequest(
 
 				if (result.disposition === 'malformed') {
 					// Malformed responses often indicate transient provider issues or
-					// credential problems. Provide actionable guidance.
+					// credential problems. Retry with a simplified request to isolate the issue.
 					const isRetryable = iteration < assembled.budget.maxProviderRounds - 1;
-					if (isRetryable) {
-						// One automatic retry for malformed responses — may be transient
+					if (isRetryable && !recoveredStarvation) {
+						recoveredStarvation = true;
+						// Retry with reduced complexity: lower reasoning, no tools on first malformed retry
+						try {
+							const recovery = await streamPacedCandidate(
+								aiService,
+								{
+									messages: messages.slice(-2), // Keep only the last user message for simplicity
+									systemInstruction: `${assembled.systemInstruction}\nProvide a concise response.`,
+									modelId: assembled.modelId,
+									reasoningEffort: 'low',
+								},
+								effectiveToken,
+								piece => {
+									streamedVisible = true;
+									response.markdown(piece);
+								},
+							);
+							const recoveryText = (recovery.text || recovery.candidate?.content?.parts?.filter(p => !p.thought).map(p => p.text ?? '').join('') || '').trim();
+							if (recoveryText.length > 0) {
+								if (!streamedVisible) {
+									rawText = recoveryText;
+								}
+								break;
+							}
+						} catch {
+							// Fall through to next retry or final message
+						}
+						// If recovery failed, continue to next iteration for one more try
 						rawText = '';
 						continue;
 					}

@@ -517,10 +517,18 @@ export function shouldShowLiveActivity(
 	if (mode === 'attentionOnly') {
 		return snapshot.status === 'attention';
 	}
+	// Always show when there is attention (approval/question) regardless of foreground state.
+	// This ensures users can respond to Magnus requests even while PreBase is active.
+	if (snapshot.status === 'attention') {
+		return true;
+	}
 	if (mode === 'alwaysWorking') {
 		return true;
 	}
-	return !snapshot.prebaseForeground;
+	// background mode: show when PreBase is NOT foregrounded, OR when there is an active
+	// working/waiting session. This ensures users can access the notch for quick messaging
+	// and session monitoring while PreBase is active, without requiring them to switch away.
+	return !snapshot.prebaseForeground || snapshot.status === 'working' || snapshot.status === 'waiting';
 }
 
 /**

@@ -21,8 +21,10 @@ static const CGFloat kBootstrapPanelHeight = kCollapsedHeight;
 static const CGFloat kPillCornerRadius = 16;
 static const CGFloat kBottomCornerRadius = 18;
 /** Top bleed: window extends this many points above the visible screen edge
-    to ensure the notch shape seamlessly overlaps the physical display boundary. */
-static const CGFloat kTopBleed = 4;
+    to ensure the notch shape seamlessly overlaps the physical display boundary.
+    On notch Macs the physical camera housing extends ~9pt above the menu bar;
+    14pt provides safe coverage across all notch hardware variants. */
+static const CGFloat kTopBleed = 14;
 /** Minimum optical top inset for compact shoulder baseline. */
 static const CGFloat kOpticalShoulderInsetMin __attribute__((used)) = 8;
 /** Extra horizontal inset so text clears curved shoulders (path-aware safe region). */
@@ -225,14 +227,17 @@ static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NS
 	return MIN(lineH * maxLines + 2, MAX(lineH, h));
 }
 
-/** Path-aware horizontal content inset — uses the ACTUAL shoulder radius, not a fixed minimum. */
-static CGFloat ContentSafeInsetX(BOOL notched, CGFloat effShoulderR) {
+/** Path-aware horizontal content inset — uses the ACTUAL body wall offset, not just the shoulder radius.
+    In expanded state, body walls start at shoulderCurve + effBottomR*0.5 from panel edges,
+    so content must clear that full offset, not just the shoulder curve alone. */
+static CGFloat ContentSafeInsetX(BOOL notched, CGFloat effShoulderR, BOOL isExpanded) {
 	if (!notched) {
 		return kContentInsetX;
 	}
-	// Content must clear the actual curved shoulder region at the current geometry.
-	// Expanded shoulders are 18pt with pronounced flare — content needs more room.
-	return MAX(kContentInsetX, effShoulderR) + kContentSafeExtraX;
+	// Expanded state: body walls are offset by shoulderCurve + effBottomR*0.5.
+	// Compact state: body walls follow the shoulder curve directly.
+	CGFloat bodyWallOffset = isExpanded ? effShoulderR + 4.0 : effShoulderR;
+	return MAX(kContentInsetX, bodyWallOffset) + kContentSafeExtraX;
 }
 
 /** Compact wing token — never arbitrary agent prose (matches TS compactWingLabel). */
@@ -504,17 +509,16 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// that cause the "floating card" appearance.
 		//
 		// The housing-to-body transition happens via shoulder curves BELOW the top edge.
-		// The body walls are inset from the panel edges, creating the visual impression
-		// of the notch expanding outward — but the top always fills the full width.
-		//
-		// This matches the architectural pattern used by Atoll and Mew Notch:
-		// full-width black surface at top, shape defined by the silhouette below.
+		// Body walls are kept close to panel edges so the expanded surface reads as
+		// a natural downward growth from the physical notch, not a floating card.
 		//
 		// Element ordering matches compact for smooth CAShapeLayer morph (14 elements).
-		CGFloat shoulderDrop = 20.0; // pronounced flare from housing to body
+		CGFloat shoulderDrop = 14.0; // subtle flare — body walls stay close to panel edges
 		CGFloat shoulderCurve = effShoulderR; // 18pt cubic bezier radius
-		CGFloat bodyLeft = shoulderCurve + effBottomR * 0.5;  // left body wall x
-		CGFloat bodyRight = totalW - shoulderCurve - effBottomR * 0.5;  // right body wall x
+		// Body walls inset only by the shoulder curve — no extra bottom-radius offset.
+		// This keeps the expanded body nearly full-width, anchored to the physical housing.
+		CGFloat bodyLeft = shoulderCurve;
+		CGFloat bodyRight = totalW - shoulderCurve;
 
 		// 0. MoveTo: full panel top-left (0, 0) — matches compact
 		CGPathMoveToPoint(path, NULL, 0, 0);
@@ -1019,7 +1023,7 @@ static NSString *JSString(Napi::Value value) {
 	field.stringValue = SanitizeTextForContainment(text);
 	field.hidden = NO;
 	[self configureLabel:field lines:lines truncating:!allowOverflow];
-	CGFloat insetX = ContentSafeInsetX(self.notched, self.cachedEffShoulderR);
+	CGFloat insetX = ContentSafeInsetX(self.notched, self.cachedEffShoulderR, YES);
 	field.frame = NSMakeRect(insetX + indent, *y, fieldW, MAX(need, lines == 1 ? kActionRowHeight : need));
 	*y += MAX(need, lines == 1 ? kActionRowHeight : need) + kContentGap;
 	return YES;
@@ -1263,7 +1267,7 @@ static NSString *JSString(Napi::Value value) {
 			// configureLabel:self.activityDescription lines:2 (used for peek measurement)
 			self.peekLabel.stringValue = sanitizedPeek;
 			self.peekLabel.hidden = NO;
-			CGFloat peekInset = ContentSafeInsetX(self.notched, self.cachedEffShoulderR) + 6;
+			CGFloat peekInset = ContentSafeInsetX(self.notched, self.cachedEffShoulderR, NO) + 6;
 			CGFloat peekW = MAX(40, totalW - peekInset * 2);
 			CGFloat bodyH = MAX(0, currentH - bandH);
 			CGFloat labelH = 16;
@@ -1320,7 +1324,7 @@ static NSString *JSString(Napi::Value value) {
 		? [NSColor colorWithCalibratedRed:0.98 green:0.72 blue:0.28 alpha:0.95]
 		: [NSColor colorWithCalibratedWhite:0.58 alpha:1.0];
 	self.statusBadge.alignment = NSTextAlignmentRight;
-	CGFloat headerInset = ContentSafeInsetX(self.notched, self.cachedEffShoulderR);
+	CGFloat headerInset = ContentSafeInsetX(self.notched, self.cachedEffShoulderR, YES);
 	CGFloat headerW = MAX(40, totalW - headerInset * 2);
 	CGFloat statusW = MIN(headerW * 0.40, MAX(44, [statusText sizeWithAttributes:@{ NSFontAttributeName: self.statusBadge.font }].width + 4));
 	CGFloat titleW = MAX(48, headerW - statusW - 8);
@@ -1348,7 +1352,7 @@ static NSString *JSString(Napi::Value value) {
 	// Document-local stacking with overflow allowed (scroll handles excess).
 	CGFloat docY = 2;
 	CGFloat docMax = 10000; // unbounded for measurement; scroll clips
-	CGFloat docContentW = MAX(40, totalW - ContentSafeInsetX(self.notched, self.cachedEffShoulderR) * 2);
+	CGFloat docContentW = MAX(40, totalW - ContentSafeInsetX(self.notched, self.cachedEffShoulderR, YES) * 2);
 	BOOL hasPending = self.pendingTitle.length > 0 || self.pendingMessage.length > 0;
 	BOOL ok = YES;
 	if (ok && self.pendingTitle.length) {
@@ -2305,8 +2309,8 @@ static NSString *JSString(Napi::Value value) {
 		self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
 	CGFloat totalW = [self computeExpandedWidth:naturalW];
 	// Path-aware safe inset: body is full width, content inset is kContentInsetX + safe extra.
-	// Shoulder radius is always 6.0 (shallow); use it directly.
-	CGFloat sideInset = ContentSafeInsetX(self.content.notched, 6.0);
+	// Expanded shoulder radius is 18pt with pronounced flare — content needs more room.
+	CGFloat sideInset = ContentSafeInsetX(self.content.notched, 18.0, YES);
 	CGFloat contentW = MAX(40, totalW - sideInset * 2);
 	CGFloat h = bandH + kContentInsetTop;
 	h += kHeaderRowHeight + kContentGap;
@@ -2585,14 +2589,13 @@ static NSString *JSString(Napi::Value value) {
 
 	const CGFloat gap = 6;
 	// Path-aware footer inset: the expanded body walls are offset from panel edges
-	// by the shoulder curve + bottom corner radius. Content must clear this.
+	// by the shoulder curve. Content must clear this.
 	CGFloat fLeftW = self.content.leftWingWidth > 0 ? self.content.leftWingWidth : kWingWidthMin;
 	CGFloat fRightW = self.content.rightWingWidth > 0 ? self.content.rightWingWidth : kWingWidthMin;
 	CGFloat fHousing = self.content.housingWidth > 0 ? self.content.housingWidth : kCameraHousingMin;
 	SilhouetteShoulderMetrics fShoulder = ComputeSilhouetteShoulderMetrics(NSWidth(win), bodyHeight, fLeftW, fRightW, fHousing, YES);
-	// For expanded state, body walls start at shoulderCurve + effBottomR*0.5 from panel edges.
-	// This is wider than the compact shoulder inset — content gets more horizontal room.
-	CGFloat footerInset = ContentSafeInsetX(self.content.notched, fShoulder.effShoulderR);
+	// For expanded state, body walls start at shoulderCurve from panel edges.
+	CGFloat footerInset = ContentSafeInsetX(self.content.notched, fShoulder.effShoulderR, YES);
 	// Bottom corner radius clips vertical space — buttons must clear it by 5pt.
 	CGFloat effBottomR = MIN(kBottomCornerRadius, bodyHeight * 0.40);
 	CGFloat bottomY = bodyHeight - kControlHeight - effBottomR - 5;
@@ -3473,7 +3476,7 @@ static NSString *JSString(Napi::Value value) {
 				@"shoulderFlare": @(shoulder.flare),
 				@"effShoulderR": @(shoulder.effShoulderR),
 				@"cachedEffShoulderR": @(self.content.cachedEffShoulderR),
-				@"contentSafeInsetX": @(ContentSafeInsetX(self.content.notched, shoulder.effShoulderR)),
+				@"contentSafeInsetX": @(ContentSafeInsetX(self.content.notched, shoulder.effShoulderR, expanded)),
 				@"topLeftX": @(shoulder.wingLeftX),
 				@"topRightX": @(shoulder.wingRightX),
 				@"panelWidth": @(bodyW),

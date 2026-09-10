@@ -576,11 +576,13 @@ test('status badge content safe inset: wider safe zone prevents right-edge clipp
 	// kContentInsetX must be 14 (was 16; MAX(14,18)+8=26 is the effective safe inset for notched)
 	assert.match(native, /kContentInsetX = 14/,
 		'base content inset must be 14pt so notched effective safe inset = MAX(14,18)+8 = 26pt');
-	// ContentSafeInsetX for notched must use the dynamic effShoulderR (not fixed kExpandedShoulderRMin)
+	// ContentSafeInsetX for notched must use the dynamic effShoulderR with isExpanded parameter
 	const contentSafeStart = native.indexOf('static CGFloat ContentSafeInsetX');
-	const contentSafeFn = contentSafeStart >= 0 ? native.slice(contentSafeStart, contentSafeStart + 500) : '';
-	assert.match(contentSafeFn, /MAX\(kContentInsetX, effShoulderR\) \+ kContentSafeExtraX/,
-		'ContentSafeInsetX must compute MAX(kContentInsetX, effShoulderR) + kContentSafeExtraX');
+	const contentSafeFn = contentSafeStart >= 0 ? native.slice(contentSafeStart, contentSafeStart + 600) : '';
+	assert.match(contentSafeFn, /BOOL isExpanded/,
+		'ContentSafeInsetX must accept isExpanded parameter for expanded shoulder geometry');
+	assert.match(contentSafeFn, /bodyWallOffset = isExpanded \? effShoulderR \+ 4\.0 : effShoulderR/,
+		'ContentSafeInsetX must compute body wall offset based on expanded state');
 });
 
 test('width buckets are purely semantic — no streaming-induced width churn', () => {
@@ -652,7 +654,7 @@ test('expanded geometry: full-width top edge with housing-to-body shoulder flare
 		'expanded top-right must span to totalW');
 
 	// Shoulder flare creates housing-to-body transition below the top edge
-	assert.match(expandedBlock, /shoulderDrop = 20\.0/);
+	assert.match(expandedBlock, /shoulderDrop = 14\.0/);
 	assert.match(expandedBlock, /shoulderCurve = effShoulderR/);
 	assert.match(expandedBlock, /full-width top edge/);
 });
@@ -692,5 +694,92 @@ test('auth card uses 16px border-radius, provider buttons use 12px', () => {
 		'backdrop blur must be 8px');
 	assert.doesNotMatch(source, /backdropFilter:\s*'blur\(6px\)/,
 		'old 6px blur must not appear');
+});
+
+test('foreground quick messaging: background mode shows working sessions when PreBase is focused', () => {
+	// Read the TS source to verify the behavior contract
+	const ts = readFileSync(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'), 'utf8');
+	// The shouldShowLiveActivity function must show working sessions when PreBase is foregrounded
+	assert.ok(ts.includes('return !snapshot.prebaseForeground || snapshot.status === \'working\' || snapshot.status === \'waiting\''),
+		'background mode must show working/waiting sessions for quick messaging when PreBase is focused');
+	// Attention sessions must always be shown regardless of foreground state
+	assert.ok(ts.includes('if (snapshot.status === \'attention\') {\n\t\treturn true;\n\t}'),
+		'attention sessions must always be shown regardless of foreground state');
+});
+
+test('content safe insets account for expanded shoulder geometry', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	// ContentSafeInsetX must accept isExpanded parameter
+	const contentSafeStart = native.indexOf('static CGFloat ContentSafeInsetX');
+	const contentSafeFn = contentSafeStart >= 0 ? native.slice(contentSafeStart, contentSafeStart + 600) : '';
+	assert.match(contentSafeFn, /BOOL isExpanded/,
+		'ContentSafeInsetX must accept isExpanded parameter');
+	assert.match(contentSafeFn, /bodyWallOffset = isExpanded \? effShoulderR \+ 4\.0 : effShoulderR/,
+		'expanded state must add 4pt to shoulder radius for body wall offset');
+	// All expanded callers must pass YES
+	const expandedCallers = ['placeContentBlock', 'headerInset', 'docContentW', 'sideInset', 'footerInset'];
+	for (const caller of expandedCallers) {
+		const idx = native.indexOf(caller);
+		if (idx >= 0) {
+			const context = native.slice(Math.max(0, idx - 200), idx + 200);
+			if (context.includes('ContentSafeInsetX')) {
+				// Verify expanded callers pass YES
+				const safeIdx = context.indexOf('ContentSafeInsetX');
+				const afterCall = context.slice(safeIdx, safeIdx + 100);
+				assert.ok(afterCall.includes(', YES)') || afterCall.includes(', expanded)'),
+					`${caller} must pass isExpanded=YES to ContentSafeInsetX`);
+			}
+		}
+	}
+});
+
+test('top bleed covers physical notch height on notch displays', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	// kTopBleed must be at least 14pt to cover the physical camera housing
+	assert.match(native, /kTopBleed = 14/,
+		'kTopBleed must be 14pt minimum to cover physical notch height (~9pt on modern MacBooks)');
+	assert.doesNotMatch(native, /kTopBleed = 4[^0-9]/,
+		'old 4pt top bleed must not appear (insufficient for physical notch coverage)');
+});
+
+test('expanded body walls stay close to panel edges for physical notch attachment', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	const expandedBlock = native.slice(
+		native.indexOf('EXPANDED GEOMETRY'),
+		native.indexOf('COMPACT/PILL GEOMETRY'),
+	);
+	// Body walls should be offset only by shoulderCurve (no extra bottom-radius offset)
+	assert.match(expandedBlock, /bodyLeft = shoulderCurve/,
+		'expanded bodyLeft must be shoulderCurve (no extra bottom-radius offset)');
+	assert.match(expandedBlock, /bodyRight = totalW - shoulderCurve/,
+		'expanded bodyRight must be totalW - shoulderCurve');
+	// Shoulder drop should be subtle (14pt, not 20pt)
+	assert.match(expandedBlock, /shoulderDrop = 14\.0/,
+		'shoulderDrop must be 14pt for subtle flare');
+});
+
+test('malformed response recovery uses simplified retry strategy', () => {
+	const source = readFileSync(resolve(repoRoot, 'extensions/prebase-magnus/src/chatParticipant.ts'), 'utf8');
+	// Must have recovery logic for malformed responses
+	assert.ok(source.includes('malformed'),
+		'malformed disposition must be handled');
+	assert.ok(source.includes('recoveredStarvation'),
+		'malformed recovery must use recoveredStarvation flag');
+	assert.ok(source.includes('messages.slice(-2)'),
+		'malformed retry must simplify message history');
+	assert.ok(source.includes('reasoningEffort: \'low\''),
+		'malformed retry must use low reasoning effort');
+});
+
+test('session listing function exists for notch session switcher', () => {
+	const source = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
+	assert.ok(source.includes('listMagnusSessions'),
+		'listMagnusSessions function must exist for session switcher');
+	assert.ok(source.includes('prebase.magnus.liveActivity.listSessions'),
+		'listSessions action must be registered');
+	assert.ok(source.includes('prebase.magnus.liveActivity.selectSession'),
+		'selectSession action must be registered');
+	assert.ok(source.includes('prebase.magnus.liveActivity.createNewAgent'),
+		'createNewAgent action must be registered');
 });
 

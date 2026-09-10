@@ -96,6 +96,24 @@ function selectPrimaryMagnusModel(models: Iterable<IChatModel>): IChatModel | un
 	return selectPrimaryMagnusSession(sessions)?.model;
 }
 
+/** List all active Magnus sessions for notch session switcher. */
+function listMagnusSessions(models: Iterable<IChatModel>): { sessionId: string; sessionResource: string; title: string; isBusy: boolean; lastMessageDate: number }[] {
+	const result: { sessionId: string; sessionResource: string; title: string; isBusy: boolean; lastMessageDate: number }[] = [];
+	for (const model of models) {
+		if (!isMagnusModel(model)) {
+			continue;
+		}
+		result.push({
+			sessionId: model.sessionId,
+			sessionResource: model.sessionResource.toString(),
+			title: model.title || 'Untitled session',
+			isBusy: model.requestInProgress.get() || model.hasActiveRequest.get() || Boolean(model.requestNeedsInput.get()),
+			lastMessageDate: model.lastMessageDate,
+		});
+	}
+	return result.sort((a, b) => b.lastMessageDate - a.lastMessageDate);
+}
+
 function toolInvocationState(invocation: IChatToolInvocation): 'running' | 'passed' | 'failed' | 'other' {
 	const state = invocation.state.get();
 	if (state.type === IChatToolInvocation.StateKind.Executing || state.type === IChatToolInvocation.StateKind.Streaming) {
@@ -861,6 +879,59 @@ registerAction2(class extends Action2 {
 			}
 		}
 		return { ok: false, reason: 'pending-timeout', kind, invokeError };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: 'prebase.magnus.liveActivity.listSessions',
+			title: localize2('prebase.magnus.liveActivity.listSessions', "List Magnus Sessions (Notch Session Switcher)"),
+			f1: false,
+		});
+	}
+	run(accessor: ServicesAccessor) {
+		const chatService = accessor.get(IChatService);
+		return listMagnusSessions(chatService.chatModels.get());
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: 'prebase.magnus.liveActivity.selectSession',
+			title: localize2('prebase.magnus.liveActivity.selectSession', "Select Magnus Session (Notch Session Switcher)"),
+			f1: false,
+		});
+	}
+	async run(accessor: ServicesAccessor, sessionId: string) {
+		const chatService = accessor.get(IChatService);
+		const commandService = accessor.get(ICommandService);
+		const models = chatService.chatModels.get();
+		for (const model of models) {
+			if (model.sessionId === sessionId && isMagnusModel(model)) {
+				// Open the specific session in PreBase chat panel
+				await commandService.executeCommand('prebase.magnus.open');
+				return { ok: true, sessionId: model.sessionId, sessionResource: model.sessionResource.toString() };
+			}
+		}
+		return { ok: false, reason: 'session-not-found' };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: 'prebase.magnus.liveActivity.createNewAgent',
+			title: localize2('prebase.magnus.liveActivity.createNewAgent', "Create New Magnus Agent (Notch)"),
+			f1: false,
+		});
+	}
+	async run(accessor: ServicesAccessor) {
+		const commandService = accessor.get(ICommandService);
+		// Open a new Magnus chat session via the standard chat command
+		await commandService.executeCommand('prebase.magnus.open');
+		return { ok: true };
 	}
 });
 

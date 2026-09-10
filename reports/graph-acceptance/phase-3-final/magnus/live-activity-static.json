@@ -11,11 +11,11 @@
   "sessionIdentity": "IChatService sessionResource — follow-up uses chatService.sendRequest",
   "approvalContinuity": "IChatToolInvocation.confirmWith on the same toolCallId",
   "questionContinuity": "native answer → question.id + optionId → notifyQuestionCarouselAnswer",
-  "durationMs": 3,
+  "durationMs": 4,
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-static",
-  "sourceHead": "39dfa9126bab3b97b83d84df05e0f572a2ca0cd1",
-  "sourceFingerprint": "f5b47b507758015fd5670688014cea449c2f9556d3efc4198eeb733a8515c87b",
-  "productFingerprint": "f5b47b507758015fd5670688014cea449c2f9556d3efc4198eeb733a8515c87b",
-  "generatedAt": "2026-09-09T18:17:15.958Z"
+  "sourceHead": "f010197dd3b4cca3f932808d33834759ec8f86fc",
+  "sourceFingerprint": "9c7dfdcdb46ade97d6e3cf732f66984f517f90b0e2770b2581925719fcfc444e",
+  "productFingerprint": "9c7dfdcdb46ade97d6e3cf732f66984f517f90b0e2770b2581925719fcfc444e",
+  "generatedAt": "2026-09-10T15:58:35.330Z"
 }
