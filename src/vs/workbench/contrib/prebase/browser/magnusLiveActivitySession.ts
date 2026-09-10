@@ -14,7 +14,7 @@ import {
 	type MagnusLiveActivitySnapshot,
 } from '../../../../platform/prebaseLiveActivity/common/magnusLiveActivity.js';
 
-function asPlainText(value: unknown): string {
+export function asPlainText(value: unknown): string {
 	if (!value) {
 		return '';
 	}

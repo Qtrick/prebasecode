@@ -114,8 +114,6 @@ export const LIVE_ACTIVITY_WING_WIDTH_MIN = 52;
 /** Stable compact/peek wing — content must not resize the island. */
 export const LIVE_ACTIVITY_WING_WIDTH_DEFAULT = 64;
 export const LIVE_ACTIVITY_WING_WIDTH = LIVE_ACTIVITY_WING_WIDTH_DEFAULT;
-/** @deprecated Wings are fixed; retained for older callers that clamp text budgets. */
-export const LIVE_ACTIVITY_WING_WIDTH_MAX = LIVE_ACTIVITY_WING_WIDTH_DEFAULT;
 export const LIVE_ACTIVITY_CAMERA_HOUSING_MIN = 24;
 /** Overflow guard — natural height is measured; this is not the default slab. */
 export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 72;
@@ -131,7 +129,7 @@ export const LIVE_ACTIVITY_EXPANDED_WIDTH_STANDARD_PAD = 36;
 export const LIVE_ACTIVITY_EXPANDED_WIDTH_WIDE_PAD = 84;
 export const LIVE_ACTIVITY_EXPANDED_MIN_WIDTH = LIVE_ACTIVITY_WING_WIDTH_DEFAULT * 2 + LIVE_ACTIVITY_CAMERA_HOUSING_MIN;
 export const LIVE_ACTIVITY_PILL_WIDTH = 228;
-export const LIVE_ACTIVITY_PILL_HEIGHT = 30;
+export const LIVE_ACTIVITY_PILL_HEIGHT = 34;
 export const LIVE_ACTIVITY_NOTCH_MIN_SAFE_TOP = 8;
 export const LIVE_ACTIVITY_NOTCH_MIN_AUX_WIDTH = 40;
 /** Compact wing copy budget (~44pt usable at 11pt system font). */

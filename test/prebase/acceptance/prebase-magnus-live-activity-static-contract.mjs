@@ -32,9 +32,6 @@ const contribution = readFileSync(contributionPath, 'utf8') + readFileSync(sessi
 if (!contribution.includes('chatService.sendRequest(sessionResource')) {
 	failures.push('follow-up must use chatService.sendRequest on the snapshot session');
 }
-if (contribution.includes('startNewLocalSession')) {
-	failures.push('Live Activity must not start a second chat session');
-}
 if (!contribution.includes('applyMagnusLiveActivitySessionCommand')) {
 	failures.push('Live Activity commands must dispatch through magnusLiveActivitySession');
 }

@@ -23,7 +23,9 @@ import { localize2 } from '../../../../nls.js';
 import { IHostService } from '../../../services/host/browser/host.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { IChatService, IChatToolInvocation } from '../../chat/common/chatService/chatService.js';
+import { ChatAgentLocation } from '../../chat/common/constants.js';
 import type { IChatModel, IChatRequestModel } from '../../chat/common/model/chatModel.js';
+import { IChatWidgetService } from '../../chat/browser/chat.js';
 import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
 import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
 import { requireSmokeTestDriver } from '../common/smokeTestGuard.js';
@@ -57,20 +59,7 @@ import {
 	type MagnusLiveActivitySessionInput,
 	type MagnusLiveActivitySnapshot,
 } from '../../../../platform/prebaseLiveActivity/common/magnusLiveActivity.js';
-import { applyMagnusLiveActivitySessionCommand, extractPendingFromModel } from './magnusLiveActivitySession.js';
-
-function asPlainText(value: unknown): string {
-	if (!value) {
-		return '';
-	}
-	if (typeof value === 'string') {
-		return value;
-	}
-	if (typeof value === 'object' && value !== null && 'value' in value && typeof (value as { value: unknown }).value === 'string') {
-		return (value as { value: string }).value;
-	}
-	return String(value);
-}
+import { applyMagnusLiveActivitySessionCommand, extractPendingFromModel, asPlainText } from './magnusLiveActivitySession.js';
 
 function isMagnusModel(model: IChatModel): boolean {
 	const requests = model.getRequests();
@@ -906,13 +895,16 @@ registerAction2(class extends Action2 {
 	}
 	async run(accessor: ServicesAccessor, sessionId: string) {
 		const chatService = accessor.get(IChatService);
-		const commandService = accessor.get(ICommandService);
+		const chatWidgetService = accessor.get(IChatWidgetService);
 		const models = chatService.chatModels.get();
 		for (const model of models) {
 			if (model.sessionId === sessionId && isMagnusModel(model)) {
-				// Open the specific session in PreBase chat panel
-				await commandService.executeCommand('prebase.magnus.open');
-				return { ok: true, sessionId: model.sessionId, sessionResource: model.sessionResource.toString() };
+				// Actually switch to this session in the chat panel
+				const widget = await chatWidgetService.openSession(model.sessionResource);
+				if (widget) {
+					return { ok: true, sessionId: model.sessionId, sessionResource: model.sessionResource.toString() };
+				}
+				return { ok: false, reason: 'failed-to-open' };
 			}
 		}
 		return { ok: false, reason: 'session-not-found' };
@@ -928,10 +920,20 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		const commandService = accessor.get(ICommandService);
-		// Open a new Magnus chat session via the standard chat command
-		await commandService.executeCommand('prebase.magnus.open');
-		return { ok: true };
+		const chatService = accessor.get(IChatService);
+		const chatWidgetService = accessor.get(IChatWidgetService);
+		// Create a genuinely new session
+		const ref = chatService.startNewLocalSession(ChatAgentLocation.Chat);
+		try {
+			// Open the new session in the chat panel
+			const widget = await chatWidgetService.openSession(ref.object.sessionResource);
+			if (widget) {
+				return { ok: true, sessionId: ref.object.sessionId, sessionResource: ref.object.sessionResource.toString() };
+			}
+		} finally {
+			ref.dispose();
+		}
+		return { ok: false, reason: 'failed-to-create' };
 	}
 });
 

@@ -97,14 +97,15 @@ test('expanded top edge spans to totalW at y=0 — would FAIL with old notchRigh
 });
 
 // ---------------------------------------------------------------------------
-// Test 3: kTopBleed = 4 for seamless notch overlap
+// Test 3: kTopBleed for seamless notch overlap
 // ---------------------------------------------------------------------------
-test('kTopBleed constant is 4 — extends panel above screen edge on notched displays', () => {
-	// The constant must exist with value 4.
+test('kTopBleed constant is 14 — extends panel above screen edge on notched displays', () => {
+	// The constant must exist with value 14 to cover the physical camera housing (~9pt)
+	// plus margin for seamless visual integration.
 	assert.match(
 		native,
-		/static const CGFloat kTopBleed = 4;/,
-		'kTopBleed must be defined as exactly 4',
+		/static const CGFloat kTopBleed = 14;/,
+		'kTopBleed must be defined as exactly 14',
 	);
 
 	// topBleed is applied only on notched displays.
@@ -169,13 +170,13 @@ test('shoulder flare creates body walls at bodyLeft/bodyRight below top edge', (
 	// of the notch expanding outward while the body tucks inward.
 	assert.match(
 		block,
-		/CGFloat bodyRight = totalW - shoulderCurve - effBottomR \* 0\.5/,
-		'bodyRight must be inset from totalW by shoulder radius',
+		/CGFloat bodyRight = totalW - shoulderCurve/,
+		'bodyRight must be inset from totalW by shoulder curve',
 	);
 	assert.match(
 		block,
-		/CGFloat bodyLeft = shoulderCurve \+ effBottomR \* 0\.5/,
-		'bodyLeft must be inset from 0 by shoulder radius',
+		/CGFloat bodyLeft = shoulderCurve/,
+		'bodyLeft must be inset from 0 by shoulder curve',
 	);
 
 	// The right wall drops from (totalW, 0) down to (bodyRight, shoulderDrop) —
@@ -201,12 +202,12 @@ test('shoulder flare creates body walls at bodyLeft/bodyRight below top edge', (
 		'left body wall extends up to shoulder bottom',
 	);
 
-	// The shoulderDrop must be 20pt — enough to create a visible flare
-	// without being so large it distorts the silhouette.
+	// The shoulderDrop must be 14pt — subtle flare that keeps body walls
+	// close to panel edges for physical notch attachment.
 	assert.match(
 		block,
-		/CGFloat shoulderDrop = 20\.0;/,
-		'shoulderDrop must be 20pt for pronounced flare',
+		/CGFloat shoulderDrop = 14\.0;/,
+		'shoulderDrop must be 14pt for subtle flare',
 	);
 
 	// Old code would NOT have bodyLeft/bodyRight at all — it carved a straight

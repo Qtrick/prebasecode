@@ -1471,12 +1471,12 @@ suite('Magnus Live Activity expanded silhouette geometry (full-width top)', () =
 		assert.doesNotMatch(computeBlock, /CGFloat effR = 6\.0;/);
 	});
 
-	test('expanded shoulder drop is 20pt for pronounced housing-to-body flare', () => {
+	test('expanded shoulder drop is 14pt for subtle housing-to-body flare', () => {
 		const expandedBlock = native.slice(
 			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-		assert.match(expandedBlock, /CGFloat shoulderDrop = 20\.0;/);
+		assert.match(expandedBlock, /CGFloat shoulderDrop = 14\.0;/);
 		assert.doesNotMatch(expandedBlock, /CGFloat shoulderDrop = 6\.0;/);
 	});
 
@@ -1526,7 +1526,7 @@ suite('Magnus Live Activity expanded silhouette geometry (full-width top)', () =
 	});
 
 	test('top bleed constant exists for seamless notch integration', () => {
-		assert.match(native, /static const CGFloat kTopBleed = 4/);
+		assert.match(native, /static const CGFloat kTopBleed = 14/);
 	});
 });
 
@@ -1839,7 +1839,7 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.strictEqual((session.match(/sendRequest\(/g) || []).length, 1, 'follow-up must have exactly one sendRequest');
 		assert.ok(session.indexOf("command.kind === 'followUp'") < session.indexOf('deps.chatService.sendRequest'), 'sendRequest is the follow-up path');
 
-		assert.doesNotMatch(contribution, /startNewLocalSession/);
+		assert.doesNotMatch(handle, /startNewLocalSession/);
 		assert.doesNotMatch(contribution, /vscode\.lm/);
 		assert.doesNotMatch(handle, /invokeTool/);
 		assert.match(contribution, /prebase\.test\.seedMagnusLiveActivityPending/);
@@ -2838,16 +2838,16 @@ suite('Magnus Live Activity expanded geometry (full-width top with shoulder flar
 		assert.match(native, /static const CGFloat kButtonCornerRadius = 10/);
 	});
 
-	test('expanded shoulder uses 20pt drop for pronounced flare', () => {
+	test('expanded shoulder uses 14pt drop for subtle flare', () => {
 		const expandedBlock = native.slice(
 			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-		assert.match(expandedBlock, /CGFloat shoulderDrop = 20\.0/);
+		assert.match(expandedBlock, /CGFloat shoulderDrop = 14\.0/);
 	});
 
 	test('top bleed constant exists for seamless notch integration', () => {
-		assert.match(native, /static const CGFloat kTopBleed = 4/);
+		assert.match(native, /static const CGFloat kTopBleed = 14/);
 	});
 
 	test('expanded geometry comment describes full-width top with shoulder flare', () => {

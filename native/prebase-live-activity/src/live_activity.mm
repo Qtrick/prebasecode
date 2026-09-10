@@ -228,13 +228,13 @@ static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NS
 }
 
 /** Path-aware horizontal content inset — uses the ACTUAL body wall offset, not just the shoulder radius.
-    In expanded state, body walls start at shoulderCurve + effBottomR*0.5 from panel edges,
-    so content must clear that full offset, not just the shoulder curve alone. */
+    In expanded state, body walls start at shoulderCurve offset from panel edges,
+    so content must clear that full offset plus a 4pt safety margin. */
 static CGFloat ContentSafeInsetX(BOOL notched, CGFloat effShoulderR, BOOL isExpanded) {
 	if (!notched) {
 		return kContentInsetX;
 	}
-	// Expanded state: body walls are offset by shoulderCurve + effBottomR*0.5.
+	// Expanded state: body walls are offset by shoulderCurve + 4pt safety margin.
 	// Compact state: body walls follow the shoulder curve directly.
 	CGFloat bodyWallOffset = isExpanded ? effShoulderR + 4.0 : effShoulderR;
 	return MAX(kContentInsetX, bodyWallOffset) + kContentSafeExtraX;

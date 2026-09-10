@@ -783,3 +783,69 @@ test('session listing function exists for notch session switcher', () => {
 		'createNewAgent action must be registered');
 });
 
+test('pill height coherence: TS LIVE_ACTIVITY_PILL_HEIGHT matches native kPillHeight (both 34)', () => {
+	const ts = readFileSync(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'), 'utf8');
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	const tsMatch = ts.match(/export const LIVE_ACTIVITY_PILL_HEIGHT\s*=\s*(\d+)/);
+	assert.ok(tsMatch, 'LIVE_ACTIVITY_PILL_HEIGHT must be exported in TS source');
+	const tsPillHeight = Number(tsMatch[1]);
+
+	const nativeMatch = native.match(/static const CGFloat kPillHeight\s*=\s*(\d+)/);
+	assert.ok(nativeMatch, 'kPillHeight must be defined in native source');
+	const nativePillHeight = Number(nativeMatch[1]);
+
+	assert.strictEqual(tsPillHeight, nativePillHeight, 'TS pill height must equal native pill height');
+	assert.strictEqual(tsPillHeight, 34, 'pill height must be 34');
+});
+
+test('session switcher uses chatWidgetService.openSession (not just prebase.magnus.open)', () => {
+	const source = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
+
+	const selectSessionStart = source.indexOf("id: 'prebase.magnus.liveActivity.selectSession'");
+	assert.ok(selectSessionStart > 0, 'selectSession action must exist');
+	const selectSessionBlock = source.slice(selectSessionStart, selectSessionStart + 900);
+
+	assert.match(selectSessionBlock, /chatWidgetService\.openSession\(/,
+		'selectSession must call chatWidgetService.openSession to actually switch sessions');
+	assert.doesNotMatch(selectSessionBlock, /prebase\.magnus\.open/,
+		'selectSession must not use prebase.magnus.open (that only opens, does not switch)');
+});
+
+test('createNewAgent uses chatService.startNewLocalSession (not just prebase.magnus.open)', () => {
+	const source = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
+
+	const createStart = source.indexOf("id: 'prebase.magnus.liveActivity.createNewAgent'");
+	assert.ok(createStart > 0, 'createNewAgent action must exist');
+	const createBlock = source.slice(createStart, createStart + 900);
+
+	assert.match(createBlock, /chatService\.startNewLocalSession\(/,
+		'createNewAgent must call chatService.startNewLocalSession to create a real new session');
+	assert.doesNotMatch(createBlock, /prebase\.magnus\.open/,
+		'createNewAgent must not use prebase.magnus.open (that opens, does not create)');
+});
+
+test('no stale geometry values: native must not contain old kTopBleed=4, shoulderDrop=20.0, or bodyLeft with effBottomR*0.5', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	assert.doesNotMatch(native, /kTopBleed = 4[^0-9]/,
+		'old kTopBleed=4 must not appear (replaced by 14)');
+	assert.doesNotMatch(native, /shoulderDrop = 20\.0/,
+		'old shoulderDrop=20.0 must not appear (replaced by 14.0)');
+	assert.doesNotMatch(native, /bodyLeft = effBottomR \* 0\.5/,
+		'old bodyLeft=effBottomR*0.5 must not appear');
+});
+
+test('ContentSafeInsetX comment mentions 4pt safety margin, not effBottomR*0.5', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	const contentSafeStart = native.indexOf('static CGFloat ContentSafeInsetX');
+	assert.ok(contentSafeStart > 0, 'ContentSafeInsetX must exist');
+	const commentBlock = native.slice(contentSafeStart - 300, contentSafeStart + 100);
+
+	assert.match(commentBlock, /4pt safety margin/,
+		'ContentSafeInsetX comment must mention 4pt safety margin');
+	assert.doesNotMatch(commentBlock, /effBottomR\*0\.5/,
+		'ContentSafeInsetX comment must not mention effBottomR*0.5');
+});
+
