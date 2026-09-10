@@ -636,29 +636,25 @@ test('premium control dimensions contract: 28pt controls, 12pt composer radius, 
 		'old 22pt bottom radius must not appear');
 });
 
-test('housing-anchored expanded geometry: top boundary is NOT full panel width', () => {
+test('expanded geometry: full-width top edge with housing-to-body shoulder flare', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	const expandedBlock = native.slice(
-		native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+		native.indexOf('EXPANDED GEOMETRY'),
 		native.indexOf('COMPACT/PILL GEOMETRY'),
 	);
 
-	// Expanded MoveTo starts at housing edge (notchLeft), NOT panel origin (0,0)
-	assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, notchLeft, 0\)/,
-		'expanded MoveTo must anchor at housing left edge (notchLeft), not panel origin (0,0)');
-	// Must NOT start at (0,0)
-	assert.doesNotMatch(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
-		'expanded MoveTo must NOT be at (0,0) — that is compact only');
+	// Expanded MoveTo starts at panel origin (0,0) — full width top, like compact
+	assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
+		'expanded MoveTo must start at (0,0) for full-width top edge');
 
-	// Top edge traverses housing width only
-	assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, notchCenter, 0\)/);
-	assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, notchRight, 0\)/);
+	// Top edge traverses full panel width
+	assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, totalW, 0\)/,
+		'expanded top-right must span to totalW');
 
-	// Shoulder curves flare outward from housing to body walls
+	// Shoulder flare creates housing-to-body transition below the top edge
 	assert.match(expandedBlock, /shoulderDrop = 20\.0/);
 	assert.match(expandedBlock, /shoulderCurve = effShoulderR/);
-	assert.match(expandedBlock, /The expanded surface emerges FROM the physical camera housing/);
-	assert.match(expandedBlock, /the full panel width/);
+	assert.match(expandedBlock, /full-width top edge/);
 });
 
 test('expanded shoulder radius is 18pt for housing-anchored flare', () => {

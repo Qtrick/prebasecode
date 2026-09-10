@@ -20,6 +20,9 @@ static const CGFloat kBootstrapPanelWidth = kStableCompactLeftWing + kCameraHous
 static const CGFloat kBootstrapPanelHeight = kCollapsedHeight;
 static const CGFloat kPillCornerRadius = 16;
 static const CGFloat kBottomCornerRadius = 18;
+/** Top bleed: window extends this many points above the visible screen edge
+    to ensure the notch shape seamlessly overlaps the physical display boundary. */
+static const CGFloat kTopBleed = 4;
 /** Minimum optical top inset for compact shoulder baseline. */
 static const CGFloat kOpticalShoulderInsetMin __attribute__((used)) = 8;
 /** Extra horizontal inset so text clears curved shoulders (path-aware safe region). */
@@ -480,7 +483,7 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	// Exactly 1 subpath, 14 elements (1 MoveTo, 7 LineTo, 5 CurveTo, 1 CloseSubpath)
 	//
 	// COMPACT: Path top spans full panel width (wings + housing solid fill at y=0).
-	// EXPANDED: Housing-anchored — top edge spans housing width, shoulders flare outward to body walls.
+	// EXPANDED: Full-width top edge (0 → totalW), housing-to-body shoulder flare below.
 	//
 	// Morph compatibility: both compact and expanded use identical element count (14) and types.
 	CGFloat depth = MAX(0.0, currentH - bandH);
@@ -494,74 +497,77 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	CGFloat effShoulderR = shoulder.effShoulderR;
 
 	if (isExpanded && depth > 0.5) {
-		// HOUSING-ANCHORED EXPANDED GEOMETRY — the true notch silhouette.
+		// EXPANDED GEOMETRY — full-width top edge, housing-to-body shoulder flare.
 		//
-		// The expanded surface emerges FROM the physical camera housing, not from
-		// the full panel width. The top visible boundary matches the housing width,
-		// and smooth shoulder curves flare the silhouette outward to the body walls.
+		// The expanded surface must have a full-width top edge (0 to totalW) to match
+		// the compact shape. This eliminates transparent gaps at the top of the panel
+		// that cause the "floating card" appearance.
 		//
-		// This creates the illusion that the physical notch itself is expanding
-		// into a larger interaction surface — the core visual principle shared by
-		// Sapphire, NotchNook, Boring Notch, and Apple Dynamic Island.
+		// The housing-to-body transition happens via shoulder curves BELOW the top edge.
+		// The body walls are inset from the panel edges, creating the visual impression
+		// of the notch expanding outward — but the top always fills the full width.
+		//
+		// This matches the architectural pattern used by Atoll and Mew Notch:
+		// full-width black surface at top, shape defined by the silhouette below.
 		//
 		// Element ordering matches compact for smooth CAShapeLayer morph (14 elements).
 		CGFloat shoulderDrop = 20.0; // pronounced flare from housing to body
 		CGFloat shoulderCurve = effShoulderR; // 18pt cubic bezier radius
+		CGFloat bodyLeft = shoulderCurve + effBottomR * 0.5;  // left body wall x
+		CGFloat bodyRight = totalW - shoulderCurve - effBottomR * 0.5;  // right body wall x
 
-		// 0. MoveTo: housing left anchor (notchLeft, 0) — NOT the full panel edge
-		CGPathMoveToPoint(path, NULL, notchLeft, 0);
+		// 0. MoveTo: full panel top-left (0, 0) — matches compact
+		CGPathMoveToPoint(path, NULL, 0, 0);
 
-		// 1. LineTo: across housing top to center
-		CGPathAddLineToPoint(path, NULL, notchCenter, 0);
+		// 1. LineTo: across top to housing left edge
+		CGPathAddLineToPoint(path, NULL, notchLeft, 0);
 
-		// 2. CurveTo (topology): degenerate straight line at y=0 across housing — keeps element types aligned with compact
+		// 2. CurveTo (topology): degenerate at y=0 — keeps element types aligned with compact
 		CGPathAddCurveToPoint(path, NULL,
 			notchLeft, 0,
 			notchCenter, 0,
 			notchCenter, 0);
 
-		// 3. LineTo: housing right anchor
+		// 3. LineTo: housing right edge
 		CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
-		// 4. LineTo: housing right edge (topology slot — same point, keeps element count parity)
-		CGPathAddLineToPoint(path, NULL, notchRight, 0);
+		// 4. LineTo: full panel top-right (totalW, 0) — matches compact
+		CGPathAddLineToPoint(path, NULL, totalW, 0);
 
-		// 5. LineTo: noop — topology slot for element count parity
-		CGPathAddLineToPoint(path, NULL, notchRight, 0);
+		// 5. LineTo: right wall top — drop from top edge to shoulder start
+		CGPathAddLineToPoint(path, NULL, bodyRight, shoulderDrop);
 
-		// 6. CurveTo: RIGHT SHOULDER — smooth cubic flare from housing edge to body wall
-		//   Control points create a continuous curvature that feels like the hardware
-		//   is naturally widening into the expanded surface.
+		// 6. CurveTo: RIGHT SHOULDER — cubic flare from top-right to body wall
 		CGPathAddCurveToPoint(path, NULL,
-			notchRight + shoulderCurve * 0.3, shoulderDrop * 0.15,
-			totalW - shoulderCurve - effBottomR * 0.5, shoulderDrop * 0.6,
-			totalW - shoulderCurve - effBottomR * 0.5, shoulderDrop);
+			totalW - shoulderCurve * 0.3, shoulderDrop * 0.15,
+			bodyRight + shoulderCurve * 0.3, shoulderDrop * 0.6,
+			bodyRight, shoulderDrop);
 
 		// 7. LineTo: down right wall to bottom-right corner start
-		CGPathAddLineToPoint(path, NULL, totalW - shoulderCurve - effBottomR * 0.5, currentH - effBottomR);
+		CGPathAddLineToPoint(path, NULL, bodyRight, currentH - effBottomR);
 
 		// 8. CurveTo: bottom-right corner (asymmetric — larger than top)
 		CGPathAddCurveToPoint(path, NULL,
-			totalW - shoulderCurve - effBottomR * 0.5, currentH - kBottom,
-			totalW - shoulderCurve - effBottomR * 0.5 - kBottom, currentH,
-			totalW - shoulderCurve - effBottomR * 0.5 - effBottomR, currentH);
+			bodyRight, currentH - kBottom,
+			bodyRight - kBottom, currentH,
+			bodyRight - effBottomR, currentH);
 
 		// 9. LineTo: across bottom to bottom-left corner start
-		CGPathAddLineToPoint(path, NULL, shoulderCurve + effBottomR * 0.5 + effBottomR, currentH);
+		CGPathAddLineToPoint(path, NULL, bodyLeft + effBottomR, currentH);
 
 		// 10. CurveTo: bottom-left corner
 		CGPathAddCurveToPoint(path, NULL,
-			shoulderCurve + effBottomR * 0.5 + kBottom, currentH,
-			shoulderCurve + effBottomR * 0.5, currentH - kBottom,
-			shoulderCurve + effBottomR * 0.5, currentH - effBottomR);
+			bodyLeft + kBottom, currentH,
+			bodyLeft, currentH - kBottom,
+			bodyLeft, currentH - effBottomR);
 
 		// 11. LineTo: up left wall to left shoulder bottom
-		CGPathAddLineToPoint(path, NULL, shoulderCurve + effBottomR * 0.5, shoulderDrop);
+		CGPathAddLineToPoint(path, NULL, bodyLeft, shoulderDrop);
 
-		// 12. CurveTo: LEFT SHOULDER — smooth cubic flare from body wall back to housing edge
+		// 12. CurveTo: LEFT SHOULDER — cubic flare from body wall to top-left
 		CGPathAddCurveToPoint(path, NULL,
-			shoulderCurve + effBottomR * 0.5, shoulderDrop * 0.6,
-			notchLeft - shoulderCurve * 0.3, shoulderDrop * 0.15,
+			bodyLeft - shoulderCurve * 0.3, shoulderDrop * 0.6,
+			notchLeft + shoulderCurve * 0.3, shoulderDrop * 0.15,
 			notchLeft, 0);
 
 		// 13. Close
@@ -2427,6 +2433,7 @@ static NSString *JSString(Napi::Value value) {
 	self.panel.hasShadow = !notched;
 	CGFloat topY = NSMaxY(frame);
 	CGFloat bandH = MAX(effectiveSafeTop, kCollapsedHeight);
+	CGFloat topBleed = notched ? kTopBleed : 0; // extend above screen edge on notch displays
 
 	NSRect win;
 	if (notched) {
@@ -2440,7 +2447,7 @@ static NSString *JSString(Napi::Value value) {
 		self.content.rightWingWidth = rightW;
 
 		CGFloat totalW = leftW + housing + rightW;
-		CGFloat height = [self computeTargetContentHeight:bandH];
+		CGFloat height = [self computeTargetContentHeight:bandH] + topBleed;
 
 		CGFloat notchCenterX = (auxLeft.size.width > kNotchMinAuxWidth)
 			? (NSMaxX(auxLeft) + housing / 2.0)
@@ -2452,17 +2459,17 @@ static NSString *JSString(Napi::Value value) {
 			if (expandedW > totalW + 0.5) {
 				totalW = expandedW;
 				CGFloat winX = notchCenterX - totalW / 2.0;
-				win = NSMakeRect(winX, topY - height, totalW, height);
+				win = NSMakeRect(winX, topY + topBleed - height, totalW, height);
 				self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
 			} else {
 				CGFloat winX = auxLeftMaxX - leftW;
-				win = NSMakeRect(winX, topY - height, totalW, height);
+				win = NSMakeRect(winX, topY + topBleed - height, totalW, height);
 				self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
 			}
 		} else {
 			CGFloat winX = auxLeftMaxX - leftW;
-			win = NSMakeRect(winX, topY - bandH, totalW, bandH);
-			self.collapsedHit = win;
+			win = NSMakeRect(winX, topY + topBleed - height, totalW, height);
+			self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
 		}
 	} else {
 		self.content.housingWidth = 0;

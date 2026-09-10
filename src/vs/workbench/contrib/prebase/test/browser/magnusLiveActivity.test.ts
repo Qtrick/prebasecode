@@ -1438,26 +1438,31 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 	});
 });
 
-suite('Magnus Live Activity housing-anchored expanded silhouette geometry', () => {
+suite('Magnus Live Activity expanded silhouette geometry (full-width top)', () => {
 
 	const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 
-	test('expanded path top edge starts at housing edges, not full panel width', () => {
+	test('expanded path starts at (0,0) for full-width top edge', () => {
 		const expandedBlock = native.slice(
-			native.indexOf('EXPANDED GEOMETRY: Housing-anchored'),
+			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
 
-		assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, notchLeft, 0\)/,
-			'expanded must start at notchLeft (housing left edge), not (0,0)');
-		assert.doesNotMatch(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
-			'must NOT start at origin — that would be a full-width floating card');
-
-		const rightEdge = expandedBlock.indexOf('notchRight, 0');
-		assert.ok(rightEdge > 0, 'must traverse to notchRight (housing right edge)');
+		assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
+			'expanded must start at (0,0) for full-width top — eliminates floating card gaps');
 	});
 
-	test('expanded shoulder radius is 18pt for housing-anchored flare', () => {
+	test('expanded top edge spans full panel width to totalW', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('EXPANDED GEOMETRY'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+
+		assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, totalW, 0\)/,
+			'expanded top-right must span to totalW — full width like compact');
+	});
+
+	test('expanded shoulder radius is 18pt for housing-to-body flare', () => {
 		const computeBlock = native.slice(
 			native.indexOf('ComputeSilhouetteShoulderMetrics'),
 			native.indexOf('return metrics'),
@@ -1468,19 +1473,17 @@ suite('Magnus Live Activity housing-anchored expanded silhouette geometry', () =
 
 	test('expanded shoulder drop is 20pt for pronounced housing-to-body flare', () => {
 		const expandedBlock = native.slice(
-			native.indexOf('EXPANDED GEOMETRY: Housing-anchored'),
+			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-		assert.match(expandedBlock, /CGFloat shoulderDrop = 20\.0;/,
-			'housing-anchored flare uses 20pt drop, not old shallow 6pt');
-		assert.doesNotMatch(expandedBlock, /CGFloat shoulderDrop = 6\.0;/,
-			'old shallow 6pt drop must not appear');
+		assert.match(expandedBlock, /CGFloat shoulderDrop = 20\.0;/);
+		assert.doesNotMatch(expandedBlock, /CGFloat shoulderDrop = 6\.0;/);
 	});
 
 	test('compact and expanded paths have identical element counts and types (morph compatibility)', () => {
 		const expandedEnd = native.indexOf('COMPACT/PILL GEOMETRY');
 		const expandedBlock = native.slice(
-			native.indexOf('EXPANDED GEOMETRY: Housing-anchored'),
+			native.indexOf('EXPANDED GEOMETRY'),
 			expandedEnd,
 		);
 		const compactBlock = native.slice(expandedEnd, native.indexOf('return path;', expandedEnd));
@@ -1519,18 +1522,11 @@ suite('Magnus Live Activity housing-anchored expanded silhouette geometry', () =
 		);
 		assert.match(csiBlock, /MAX\(kContentInsetX, effShoulderR\) \+ kContentSafeExtraX/);
 
-		// For expanded: MAX(14, 18) + 8 = 26pt content safe inset
-		// For compact: MAX(14, 6) + 8 = 22pt content safe inset
 		assert.match(native, /ContentSafeInsetX\(self\.content\.notched, shoulder\.effShoulderR\)/);
 	});
 
-	test('expanded topology curve connects housing edges with shoulder flare', () => {
-		const expandedBlock = native.slice(
-			native.indexOf('EXPANDED GEOMETRY: Housing-anchored'),
-			native.indexOf('COMPACT/PILL GEOMETRY'),
-		);
-		// The degenerate CurveTo at the top should still be between notchLeft/notchCenter for element parity
-		assert.match(expandedBlock, /notchLeft, 0,\s*\n\s*notchCenter, 0,\s*\n\s*notchCenter, 0/);
+	test('top bleed constant exists for seamless notch integration', () => {
+		assert.match(native, /static const CGFloat kTopBleed = 4/);
 	});
 });
 
@@ -2772,44 +2768,40 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 	});
 });
 
-suite('Magnus Live Activity housing-anchored expanded geometry (redesign)', () => {
+suite('Magnus Live Activity expanded geometry (full-width top with shoulder flare)', () => {
 
 	ensureNoDisposablesAreLeakedInTestSuite();
 	const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 
-	test('expanded shoulder radius is 18pt for housing-anchored flare (was 6pt for broad-top)', () => {
+	test('expanded shoulder radius is 18pt for housing-to-body flare', () => {
 		const computeBlock = native.slice(
 			native.indexOf('ComputeSilhouetteShoulderMetrics'),
 			native.indexOf('return metrics'),
 		);
-		// New: expanded uses 18pt shoulder, not 6pt
 		assert.match(computeBlock, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/);
-		assert.doesNotMatch(computeBlock, /CGFloat effR = 6\.0;/,
-			'expanded must NOT use the old 6pt broad-top shoulder');
 	});
 
-	test('expanded path starts at housing edges, NOT full panel width', () => {
+	test('expanded path starts at (0,0) for full-width top edge', () => {
 		const expandedBlock = native.slice(
-			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-		// Housing-anchored: top-left is at notchLeft, not 0
-		assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, notchLeft, 0\)/,
-			'move-to must start at housing left edge (notchLeft), not panel origin');
-		// Top edge traverses housing width only, then flares outward
-		assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, notchCenter, 0\)/);
-		assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, notchRight, 0\)/);
-		// Body width is reached via shoulder curves, not a straight top edge
-		assert.match(expandedBlock, /shoulderDrop = 20\.0/);
-		assert.match(expandedBlock, /shoulderCurve = effShoulderR/);
-		// Must NOT start at full panel width
-		assert.doesNotMatch(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
-			'expanded MoveTo must NOT be at (0,0) — that is compact only');
+		assert.match(expandedBlock, /CGPathMoveToPoint\(path, NULL, 0, 0\)/,
+			'expanded must start at (0,0) for full-width top — eliminates floating card');
+	});
+
+	test('expanded top edge spans full panel width to totalW', () => {
+		const expandedBlock = native.slice(
+			native.indexOf('EXPANDED GEOMETRY'),
+			native.indexOf('COMPACT/PILL GEOMETRY'),
+		);
+		assert.match(expandedBlock, /CGPathAddLineToPoint\(path, NULL, totalW, 0\)/,
+			'expanded top-right must span to totalW — full width like compact');
 	});
 
 	test('expanded and compact paths have identical element count for CAShapeLayer morph', () => {
 		const expandedBlock = native.slice(
-			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
 		const compactBlock = native.slice(
@@ -2817,7 +2809,6 @@ suite('Magnus Live Activity housing-anchored expanded geometry (redesign)', () =
 			native.indexOf('return path;'),
 		);
 
-		// Both must have exactly 14 elements (MoveTo, LineTo×8, CurveTo×4, CloseSubpath)
 		const expandedMoves = (expandedBlock.match(/CGPathMoveToPoint/g) || []).length;
 		const compactMoves = (compactBlock.match(/CGPathMoveToPoint/g) || []).length;
 		assert.strictEqual(expandedMoves, compactMoves, 'same MoveTo count');
@@ -2835,45 +2826,41 @@ suite('Magnus Live Activity housing-anchored expanded geometry (redesign)', () =
 		assert.strictEqual(expandedClose, compactClose, 'same Close count');
 	});
 
-	test('bottom corner radius changed from 22 to 18 for asymmetric curvature', () => {
+	test('bottom corner radius is 18 for asymmetric curvature', () => {
 		assert.match(native, /static const CGFloat kBottomCornerRadius = 18/);
-		assert.doesNotMatch(native, /static const CGFloat kBottomCornerRadius = 22/,
-			'old 22pt bottom radius must be replaced with 18');
 	});
 
-	test('composer corner radius changed from 10 to 12', () => {
+	test('composer corner radius is 12', () => {
 		assert.match(native, /static const CGFloat kComposerCornerRadius = 12/);
-		assert.doesNotMatch(native, /static const CGFloat kComposerCornerRadius = 10[^0-9]/,
-			'old 10pt composer radius must be replaced with 12');
 	});
 
-	test('button corner radius is 10pt for rounded action buttons', () => {
+	test('button corner radius is 10', () => {
 		assert.match(native, /static const CGFloat kButtonCornerRadius = 10/);
 	});
 
-	test('expanded shoulder uses 20pt drop for pronounced flare from housing to body', () => {
+	test('expanded shoulder uses 20pt drop for pronounced flare', () => {
 		const expandedBlock = native.slice(
-			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
 		assert.match(expandedBlock, /CGFloat shoulderDrop = 20\.0/);
-		assert.match(expandedBlock, /pronounced flare from housing to body/);
 	});
 
-	test('expanded geometry comment describes housing-anchored silhouette, not broad-top full-width', () => {
+	test('top bleed constant exists for seamless notch integration', () => {
+		assert.match(native, /static const CGFloat kTopBleed = 4/);
+	});
+
+	test('expanded geometry comment describes full-width top with shoulder flare', () => {
 		const expandedBlock = native.slice(
-			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-		assert.match(expandedBlock, /HOUSING-ANCHORED EXPANDED GEOMETRY/);
-		assert.match(expandedBlock, /The expanded surface emerges FROM the physical camera housing/);
-		assert.match(expandedBlock, /the full panel width/);
-		assert.match(expandedBlock, /the physical notch itself is expanding/);
-		assert.doesNotMatch(expandedBlock, /Broad top-edge attachment/,
-			'broad-top label must be replaced by housing-anchored');
+		assert.match(expandedBlock, /full-width top edge/);
+		assert.match(expandedBlock, /shoulder flare/);
+		assert.doesNotMatch(expandedBlock, /Housing-anchored/);
 	});
 
-	test('layoutLiveActivityPanelFrame expanded top boundary is housing width, not full panel', () => {
+	test('layoutLiveActivityPanelFrame expanded top boundary is full panel width', () => {
 		const builtinNotched: LiveActivityScreenLayout = {
 			originX: 0,
 			originY: 0,
@@ -2892,13 +2879,13 @@ suite('Magnus Live Activity housing-anchored expanded geometry (redesign)', () =
 		assert.strictEqual(expanded.frame.width, LIVE_ACTIVITY_WING_WIDTH + geo.cameraHousingWidth + LIVE_ACTIVITY_WING_WIDTH);
 		// Expanded panel width must be less than screen width
 		assert.ok(expanded.frame.width < builtinNotched.width,
-			'expanded must not span full panel width — it is housing-anchored');
-		// Top boundary is housing-anchored: MoveTo at notchLeft, not at 0
+			'expanded must not span full screen — it is panel-width');
+		// Top boundary is full-width: MoveTo at (0,0), not at notchLeft
 		const expandedBlock = native.slice(
-			native.indexOf('HOUSING-ANCHORED EXPANDED GEOMETRY'),
+			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-		assert.match(expandedBlock, /MoveToPoint\(path, NULL, notchLeft, 0\)/);
+		assert.match(expandedBlock, /MoveToPoint\(path, NULL, 0, 0\)/);
 	});
 });
 
