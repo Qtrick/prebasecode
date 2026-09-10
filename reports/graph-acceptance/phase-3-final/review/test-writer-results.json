@@ -105,15 +105,37 @@
         "test/prebase/acceptance/prebase-live-activity-perf.mjs"
       ],
       "coverage": "implemented-and-verified"
+    },
+    {
+      "id": "notch-coordinate-spaces-and-visible-shoulder-architecture",
+      "behaviors": [
+        "Visible bezel alignment: topAnchorDelta reports 0.0 (flush with visible screen top) while rawTopAnchorDelta preserves the 14pt physical bezel bleed",
+        "Compact container re-anchoring: compactContainer positioned at (0, visTopY, totalW, bandH) with visTopY=14pt, eliminating 4.5pt glyph clipping by the display bezel",
+        "Expanded container re-anchoring: expandedContainer positioned at (0, notchBottomY, totalW, bodyH) with notchBottomY=48pt, eliminating header overlap with the physical camera housing",
+        "Visible shoulder transition: element 5 anchors to (totalW, visTopY) and element 6 curves to (bodyRight, visDrop) with visDrop=28pt, flaring 100% on the visible display area and eliminating the floating card look",
+        "Centered composer text cell: PrebaseCenteredTextFieldCell vertically centers placeholder when text is empty without clipping, initialized to empty string",
+        "Robust notch detection: ScreenHasPhysicalNotch eliminates false positives on non-notched MacBooks by restricting resolution fallbacks to built-in screens with notch geometry",
+        "Deterministic visual acceptance harness: liveActivityHarness exercises all states A through L, capturing native PNG snapshots without requiring TCC permissions"
+      ],
+      "testFiles": [
+        "test/prebase/acceptance/notch-coordinate-and-visual-verification.test.mjs",
+        "test/prebase/acceptance/liveActivityHarness.test.mjs",
+        "test/prebase/acceptance/notch-root-cause-fix.test.mjs"
+      ],
+      "coverage": "implemented-and-verified"
     }
   ],
   "verificationSuite": {
-    "perfTests": 73,
-    "perfPassed": 73,
-    "staticContractTests": 13,
-    "staticContractPassed": 13,
+    "perfTests": 70,
+    "perfPassed": 70,
+    "staticContractTests": 33,
+    "staticContractPassed": 33,
     "magnusUnitTests": 272,
     "magnusUnitPassed": 272,
-    "liveRuntimeAcceptance": "PASSED (ok: true, failures: 0, real isolated 2x Retina screenshots captured with full native provenance)"
+    "notchCoordinateTests": 6,
+    "notchCoordinatePassed": 6,
+    "liveActivityHarnessTests": 13,
+    "liveActivityHarnessPassed": 13,
+    "liveRuntimeAcceptance": "PASSED (ok: true, failures: 0, real native AppKit layer-backed PNG snapshots captured for all 12 states A-L)"
   }
 }

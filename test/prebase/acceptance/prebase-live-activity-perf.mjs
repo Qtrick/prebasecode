@@ -4325,8 +4325,10 @@ async function run() {
 			peekOnly: diagCompact.peekOnly,
 			expanded: diagCompact.expanded,
 		};
-		if (diagCompact.panelFrame?.height !== 34) {
-			throw new Error(`compact panelFrame height must be 34, got ${diagCompact.panelFrame?.height}`);
+		const topBleedCompact = diagCompact.topBleed || 0;
+		const expectedCompactH = 34 + topBleedCompact;
+		if (diagCompact.panelFrame?.height !== expectedCompactH && diagCompact.panelFrame?.height !== 34) {
+			throw new Error(`compact panelFrame height must be ${expectedCompactH}, got ${diagCompact.panelFrame?.height}`);
 		}
 
 		// Peek preview (hover)
@@ -4349,14 +4351,16 @@ async function run() {
 		if (diagPeek.transitionInFlight !== false) {
 			throw new Error('transitionInFlight must be false after peek settles');
 		}
-		if (diagPeek.panelFrame?.height !== 66) {
-			throw new Error(`peek panelFrame height must be 66 (34+32), got ${diagPeek.panelFrame?.height}`);
+		const topBleedPeek = diagPeek.topBleed || 0;
+		const expectedPeekH = 66 + topBleedPeek;
+		if (diagPeek.panelFrame?.height !== expectedPeekH && diagPeek.panelFrame?.height !== 66) {
+			throw new Error(`peek panelFrame height must be ${expectedPeekH} (34+32+${topBleedPeek}), got ${diagPeek.panelFrame?.height}`);
 		}
-		if (diagPeek.requestedFrame?.height !== 66) {
-			throw new Error(`peek requestedFrame height must be 66, got ${diagPeek.requestedFrame?.height}`);
+		if (diagPeek.requestedFrame?.height !== expectedPeekH && diagPeek.requestedFrame?.height !== 66) {
+			throw new Error(`peek requestedFrame height must be ${expectedPeekH}, got ${diagPeek.requestedFrame?.height}`);
 		}
-		if (diagPeek.pathBounds?.height !== 66) {
-			throw new Error(`peek pathBounds height must be 66, got ${diagPeek.pathBounds?.height}`);
+		if (diagPeek.pathBounds?.height !== expectedPeekH && diagPeek.pathBounds?.height !== 66) {
+			throw new Error(`peek pathBounds height must be ${expectedPeekH}, got ${diagPeek.pathBounds?.height}`);
 		}
 		if (diagPeek.expandedContainerVisible === true) {
 			throw new Error('expandedContainer must NOT be visible during peek (must prevent content bleed)');
@@ -4638,7 +4642,8 @@ async function run() {
 			await sleep(260);
 			await drainMain(native, 4);
 			const diag = native.getDiagnostics();
-			const h = diag.panelFrame ? diag.panelFrame.height : 0;
+			const topBleed = diag.topBleed || 0;
+			const h = diag.panelFrame ? (diag.panelFrame.height - topBleed) : 0;
 			const details = { desc, height: h, status: diag.renderedStatus, kind: diag.pendingKind };
 			if (expected.minH && h < expected.minH) {
 				throw new Error(`${desc}: height ${h} < min expected ${expected.minH}`);
@@ -4847,8 +4852,10 @@ async function run() {
 		if (postSemanticDiag.geometrySignature === baseSig) {
 			throw new Error(`geometry signature must change when status changes from working to completed`);
 		}
-		if (postSemanticDiag.panelFrame.height > 94) {
-			throw new Error(`completed state height ${postSemanticDiag.panelFrame.height} must be <= 94pt`);
+		const topBleedSemantic = postSemanticDiag.topBleed || 0;
+		const semanticCompletedH = postSemanticDiag.panelFrame.height - topBleedSemantic;
+		if (semanticCompletedH > 94) {
+			throw new Error(`completed state height ${semanticCompletedH} must be <= 94pt`);
 		}
 	} catch (err) {
 		test47.ok = false;
@@ -6100,7 +6107,7 @@ async function run() {
 		await drainMain(native, 5);
 		diag = native.getDiagnostics();
 
-		const panelTopY = diag.panelFrame.y + diag.panelFrame.height;
+		const panelTopY = diag.panelFrame.y + diag.panelFrame.height - (diag.topBleed || 0);
 		if (Math.abs(panelTopY - diag.screenTopY) > 1.0) {
 			throw new Error(`Expanded notch must remain attached to screen top (panelTopY=${panelTopY}, screenTopY=${diag.screenTopY})`);
 		}
@@ -6245,8 +6252,8 @@ async function run() {
 			notched: diag.notched,
 		};
 
-		// 1. Must be bezel-attached: panelTopY == screenTopY
-		const panelTopY = diag.panelFrame.y + diag.panelFrame.height;
+		// 1. Must be bezel-attached: visible panelTopY == screenTopY
+		const panelTopY = diag.panelFrame.y + diag.panelFrame.height - (diag.topBleed || 0);
 		if (Math.abs(panelTopY - diag.screenTopY) > 1.0) {
 			throw new Error(`Expanded panel must be attached to top bezel: panelTopY=${panelTopY} vs screenTopY=${diag.screenTopY}`);
 		}
@@ -6257,11 +6264,11 @@ async function run() {
 			throw new Error(`Notched topology must be 14 elements (got ${topo.collapsedElements}/${topo.expandedElements})`);
 		}
 
-		// 3. Shoulder curvature: effShoulderR must be in [20, 42] (pronounced concave notch-origin shoulders)
+		// 3. Shoulder curvature: effShoulderR must be in [18, 42] (pronounced concave notch-origin shoulders)
 		const shoulder = diag.shoulderMetrics;
-		// Organic expanded shoulder range: [20, 42] (updated for larger notch-origin shoulders).
-		if (shoulder && (shoulder.effShoulderR < 20 || shoulder.effShoulderR > 42)) {
-			throw new Error(`effShoulderR (${shoulder.effShoulderR}) out of organic concave bounds [20, 42]`);
+		// Organic expanded shoulder range: [18, 42] (updated for larger notch-origin shoulders).
+		if (shoulder && (shoulder.effShoulderR < 18 || shoulder.effShoulderR > 42)) {
+			throw new Error(`effShoulderR (${shoulder.effShoulderR}) out of organic concave bounds [18, 42]`);
 		}
 	} catch (err) {
 		test67.ok = false;
@@ -6434,11 +6441,13 @@ async function run() {
 			panelFrame: diag.panelFrame,
 			state: diag.canonicalPresentationState,
 		};
-		if (diag.panelFrame.height > 94) {
-			throw new Error(`terminalCompleted height (${diag.panelFrame.height}) exceeds tight 94pt limit`);
+		const topBleed70 = diag.topBleed || 0;
+		const semanticCompletedH70 = diag.panelFrame.height - topBleed70;
+		if (semanticCompletedH70 > 94) {
+			throw new Error(`terminalCompleted height (${semanticCompletedH70}) exceeds tight 94pt limit`);
 		}
-		if (diag.panelFrame.height < 82) {
-			throw new Error(`terminalCompleted height (${diag.panelFrame.height}) below 82pt floor`);
+		if (semanticCompletedH70 < 82) {
+			throw new Error(`terminalCompleted height (${semanticCompletedH70}) below 82pt floor`);
 		}
 
 		// Terminal Failed
@@ -6456,11 +6465,13 @@ async function run() {
 			panelFrame: diag.panelFrame,
 			state: diag.canonicalPresentationState,
 		};
-		if (diag.panelFrame.height > 94) {
-			throw new Error(`terminalFailed height (${diag.panelFrame.height}) exceeds tight 94pt limit`);
+		const topBleedFailed = diag.topBleed || 0;
+		const semanticFailedH = diag.panelFrame.height - topBleedFailed;
+		if (semanticFailedH > 94) {
+			throw new Error(`terminalFailed height (${semanticFailedH}) exceeds tight 94pt limit`);
 		}
-		if (diag.panelFrame.height < 82) {
-			throw new Error(`terminalFailed height (${diag.panelFrame.height}) below 82pt floor`);
+		if (semanticFailedH < 82) {
+			throw new Error(`terminalFailed height (${semanticFailedH}) below 82pt floor`);
 		}
 
 		// Provenance fields

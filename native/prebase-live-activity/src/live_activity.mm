@@ -72,9 +72,15 @@ static NSDictionary *RectDict(NSRect r) {
 
 @implementation PrebaseCenteredTextFieldCell
 - (NSRect)drawingRectForBounds:(NSRect)proposedRect {
-	// Center the text glyph vertically within the field bounds.
 	NSRect baseRect = [super drawingRectForBounds:proposedRect];
-	NSSize textSize = [[self attributedStringValue] size];
+	NSAttributedString *attr = [self attributedStringValue];
+	NSSize textSize = (attr && attr.length > 0) ? [attr size] : [[self placeholderAttributedString] size];
+	if (textSize.height <= 0 && self.font) {
+		textSize.height = ceil(self.font.capHeight + 4);
+	}
+	if (textSize.height <= 0) {
+		return baseRect;
+	}
 	CGFloat verticalOffset = floor((NSHeight(baseRect) - textSize.height) / 2.0);
 	return NSMakeRect(NSMinX(baseRect), NSMinY(baseRect) + verticalOffset, NSWidth(baseRect), textSize.height);
 }
@@ -327,15 +333,15 @@ static BOOL ScreenHasPhysicalNotch(NSScreen *screen) {
 		&& NSMinX(auxRight) > NSMaxX(auxLeft)) {
 		return YES;
 	}
-	NSRect f = screen.frame;
-	if ((fabs(f.size.width - 1512) < 2.0 && fabs(f.size.height - 982) < 2.0) ||
-		(fabs(f.size.width - 1728) < 2.0 && fabs(f.size.height - 1117) < 2.0) ||
-		(fabs(f.size.width - 1470) < 2.0 && fabs(f.size.height - 956) < 2.0) ||
-		(fabs(f.size.width - 1710) < 2.0 && fabs(f.size.height - 1107) < 2.0)) {
-		return YES;
-	}
+	// Fallback to known physical notch display resolutions only on built-in screens
 	if (IsBuiltinScreen(screen)) {
-		return YES;
+		NSRect f = screen.frame;
+		if ((fabs(f.size.width - 1512) < 2.0 && fabs(f.size.height - 982) < 2.0) ||
+			(fabs(f.size.width - 1728) < 2.0 && fabs(f.size.height - 1117) < 2.0) ||
+			(fabs(f.size.width - 1470) < 2.0 && fabs(f.size.height - 956) < 2.0) ||
+			(fabs(f.size.width - 1710) < 2.0 && fabs(f.size.height - 1107) < 2.0)) {
+			return YES;
+		}
 	}
 	return NO;
 }
@@ -519,6 +525,9 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// This keeps the expanded body nearly full-width, anchored to the physical housing.
 		CGFloat bodyLeft = shoulderCurve;
 		CGFloat bodyRight = totalW - shoulderCurve;
+		CGFloat topBleed = kTopBleed;
+		CGFloat visTopY = topBleed;
+		CGFloat visDrop = visTopY + shoulderDrop;
 
 		// 0. MoveTo: full panel top-left (0, 0) — matches compact
 		CGPathMoveToPoint(path, NULL, 0, 0);
@@ -538,14 +547,14 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// 4. LineTo: full panel top-right (totalW, 0) — matches compact
 		CGPathAddLineToPoint(path, NULL, totalW, 0);
 
-		// 5. LineTo: right wall top — drop from top edge to shoulder start
-		CGPathAddLineToPoint(path, NULL, bodyRight, shoulderDrop);
+		// 5. LineTo: right wall top — drop through top bleed to visible bezel anchor
+		CGPathAddLineToPoint(path, NULL, totalW, visTopY);
 
-		// 6. CurveTo: RIGHT SHOULDER — cubic flare from top-right to body wall
+		// 6. CurveTo: RIGHT SHOULDER — smooth cubic flare from (totalW, visTopY) to (bodyRight, visDrop)
 		CGPathAddCurveToPoint(path, NULL,
-			totalW - shoulderCurve * 0.3, shoulderDrop * 0.15,
-			bodyRight + shoulderCurve * 0.3, shoulderDrop * 0.6,
-			bodyRight, shoulderDrop);
+			totalW, visTopY + shoulderDrop * 0.45,
+			bodyRight + (totalW - bodyRight) * 0.20, visDrop,
+			bodyRight, visDrop);
 
 		// 7. LineTo: down right wall to bottom-right corner start
 		CGPathAddLineToPoint(path, NULL, bodyRight, currentH - effBottomR);
@@ -566,13 +575,13 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 			bodyLeft, currentH - effBottomR);
 
 		// 11. LineTo: up left wall to left shoulder bottom
-		CGPathAddLineToPoint(path, NULL, bodyLeft, shoulderDrop);
+		CGPathAddLineToPoint(path, NULL, bodyLeft, visDrop);
 
-		// 12. CurveTo: LEFT SHOULDER — cubic flare from body wall to top-left
+		// 12. CurveTo: LEFT SHOULDER — smooth cubic flare from (bodyLeft, visDrop) up to (0, 0)
 		CGPathAddCurveToPoint(path, NULL,
-			bodyLeft - shoulderCurve * 0.3, shoulderDrop * 0.6,
-			notchLeft + shoulderCurve * 0.3, shoulderDrop * 0.15,
-			notchLeft, 0);
+			bodyLeft - bodyLeft * 0.20, visDrop,
+			0, visTopY + shoulderDrop * 0.45,
+			0, 0);
 
 		// 13. Close
 		CGPathCloseSubpath(path);
@@ -1209,9 +1218,14 @@ static NSString *JSString(Napi::Value value) {
 	SilhouetteShoulderMetrics shoulder = ComputeSilhouetteShoulderMetrics(totalW, MAX(0, currentH - bandH), leftW, rightW, housing, isExpanded);
 	self.cachedEffShoulderR = shoulder.effShoulderR;
 
-	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
-	self.peekContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
-	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
+	CGFloat topBleed = self.notched ? kTopBleed : 0.0;
+	CGFloat visTopY = topBleed;
+	CGFloat notchBottomY = topBleed + bandH;
+	CGFloat bodyH = MAX(0.0, currentH - notchBottomY);
+
+	self.compactContainer.frame = NSMakeRect(0, visTopY, totalW, bandH);
+	self.peekContainer.frame = NSMakeRect(0, notchBottomY, totalW, bodyH);
+	self.expandedContainer.frame = NSMakeRect(0, notchBottomY, totalW, bodyH);
 
 	// Compact state: only collapsed wing chrome
 	if (!isExpanded && !isPeek) {
@@ -1269,7 +1283,7 @@ static NSString *JSString(Napi::Value value) {
 			self.peekLabel.hidden = NO;
 			CGFloat peekInset = ContentSafeInsetX(self.notched, self.cachedEffShoulderR, NO) + 6;
 			CGFloat peekW = MAX(40, totalW - peekInset * 2);
-			CGFloat bodyH = MAX(0, currentH - bandH);
+			CGFloat bodyH = MAX(0.0, currentH - notchBottomY);
 			CGFloat labelH = 16;
 			CGFloat textY = MAX(6, floor((bodyH - labelH) / 2.0));
 			self.peekLabel.frame = NSMakeRect(peekInset, textY, peekW, labelH);
@@ -1297,7 +1311,7 @@ static NSString *JSString(Napi::Value value) {
 		[self.contentDocumentView addSubview:self.activityDescription];
 	}
 
-	CGFloat bodyHeight = MAX(0, currentH - bandH);
+	CGFloat bodyHeight = MAX(0.0, currentH - notchBottomY);
 	// Always trust the live control-stack measurement so the scroll viewport
 	// never paints under Deny/Approve/composer (sibling overlap clips glyphs).
 	CGFloat measuredFooter = self.controller
@@ -1418,9 +1432,13 @@ static NSString *JSString(Napi::Value value) {
 
 	// Stage content into the *target* silhouette before morphing so expansion never
 	// reveals an empty black panel while bounds are still collapsed.
-	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
-	self.peekContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
-	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
+	CGFloat topBleed = self.notched ? kTopBleed : 0.0;
+	CGFloat visTopY = topBleed;
+	CGFloat notchBottomY = topBleed + bandH;
+	CGFloat bodyH = MAX(0.0, currentH - notchBottomY);
+	self.compactContainer.frame = NSMakeRect(0, visTopY, totalW, bandH);
+	self.peekContainer.frame = NSMakeRect(0, notchBottomY, totalW, bodyH);
+	self.expandedContainer.frame = NSMakeRect(0, notchBottomY, totalW, bodyH);
 	if (self.controller) {
 		self.reservedFooterHeight = [self.controller computeControlsStackHeight] + kContentFooterGutter;
 		if (animated && !self.reducedMotion) {
@@ -1888,12 +1906,14 @@ static NSString *JSString(Napi::Value value) {
 	self.content.accessibilityRole = NSAccessibilityGroupRole;
 
 	PrebaseCenteredTextFieldCell *inputCell = [[PrebaseCenteredTextFieldCell alloc] init];
+	inputCell.stringValue = @"";
 	inputCell.placeholderString = @"Message Magnus…";
 	inputCell.font = [NSFont systemFontOfSize:12 weight:NSFontWeightRegular];
 	inputCell.wraps = NO;
 	inputCell.scrollable = YES;
 	self.input = [[NSTextField alloc] initWithFrame:NSMakeRect(14, 0, 200, kControlHeight)];
 	self.input.cell = inputCell;
+	self.input.stringValue = @"";
 	self.input.placeholderString = @"Message Magnus…";
 	self.input.font = [NSFont systemFontOfSize:12 weight:NSFontWeightRegular];
 	self.input.focusRingType = NSFocusRingTypeExterior;
@@ -2571,12 +2591,15 @@ static NSString *JSString(Napi::Value value) {
 
 	CGFloat bandH = MAX(self.content.safeAreaTop, kCollapsedHeight);
 	CGFloat effectiveH = win.size.height;
-	CGFloat bodyHeight = effectiveH - bandH;
+	CGFloat topBleed = self.content.notched ? kTopBleed : 0.0;
+	CGFloat visTopY = topBleed;
+	CGFloat notchBottomY = topBleed + bandH;
+	CGFloat bodyHeight = MAX(0.0, effectiveH - notchBottomY);
 	// Keep the expanded container synchronized with the geometry we lay into so
 	// diagnostics and hit-testing match control frames (avoids panel/path desync).
 	if (self.content.expandedContainer) {
-		self.content.expandedContainer.frame = NSMakeRect(0, bandH, NSWidth(win), MAX(0, bodyHeight));
-		self.content.compactContainer.frame = NSMakeRect(0, 0, NSWidth(win), bandH);
+		self.content.expandedContainer.frame = NSMakeRect(0, notchBottomY, NSWidth(win), bodyHeight);
+		self.content.compactContainer.frame = NSMakeRect(0, visTopY, NSWidth(win), bandH);
 	}
 	if (bodyHeight < 36.0 && !self.transitionInFlight) {
 		self.input.hidden = YES;
@@ -3185,6 +3208,44 @@ static NSString *JSString(Napi::Value value) {
 	[self refreshContentOnly];
 }
 
+- (NSData *)renderSnapshotPNG {
+	if (!self.content) {
+		return nil;
+	}
+	NSRect bounds = self.content.bounds;
+	if (bounds.size.width <= 0 || bounds.size.height <= 0) {
+		return nil;
+	}
+	CGFloat scale = 2.0;
+	if (self.panel && self.panel.screen) {
+		scale = self.panel.screen.backingScaleFactor;
+	}
+	if (scale <= 0.0) {
+		scale = 2.0;
+	}
+	NSInteger pxWidth = (NSInteger)ceil(bounds.size.width * scale);
+	NSInteger pxHeight = (NSInteger)ceil(bounds.size.height * scale);
+
+	NSBitmapImageRep *rep = [[NSBitmapImageRep alloc]
+		initWithBitmapDataPlanes:NULL
+		pixelsWide:pxWidth
+		pixelsHigh:pxHeight
+		bitsPerSample:8
+		samplesPerPixel:4
+		hasAlpha:YES
+		isPlanar:NO
+		colorSpaceName:NSDeviceRGBColorSpace
+		bytesPerRow:pxWidth * 4
+		bitsPerPixel:32];
+	if (!rep) {
+		return nil;
+	}
+	rep.size = bounds.size;
+
+	[self.content cacheDisplayInRect:bounds toBitmapImageRep:rep];
+	return [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+}
+
 - (NSDictionary *)diagnosticsDict {
 	NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
 	if (self.transitionInFlight && now >= self.transitionEndTime) {
@@ -3276,9 +3337,15 @@ static NSString *JSString(Napi::Value value) {
 		NSRect pf = self.panel.frame;
 		CGFloat screenTopY = NSMaxY(sf);
 		CGFloat panelTopY = NSMaxY(pf);
+		CGFloat topBleed = self.content.notched ? kTopBleed : 0.0;
 		dict[@"panelTopY"] = @(panelTopY);
 		dict[@"screenTopY"] = @(screenTopY);
-		dict[@"topAnchorDelta"] = @(screenTopY - panelTopY);
+		// Visible screen top anchor delta: difference between screen top and panel's visible content top.
+		// When panel bleeds kTopBleed into hardware bezel, panelTopY = screenTopY + topBleed,
+		// so visible delta is 0.0 (flush with visible screen bezel).
+		dict[@"topAnchorDelta"] = @(screenTopY - (panelTopY - topBleed));
+		dict[@"rawTopAnchorDelta"] = @(screenTopY - panelTopY);
+		dict[@"topBleed"] = @(topBleed);
 	}
 	dict[@"notchDetected"] = @(self.content.notched);
 	dict[@"panelLevel"] = @(self.panel.level);
@@ -3382,10 +3449,11 @@ static NSString *JSString(Napi::Value value) {
 		// mid-morph or immediately after a content-only refresh.
 		CGFloat bodyW = NSWidth(self.content.expandedContainer.bounds);
 		CGFloat bodyH = NSHeight(self.content.expandedContainer.bounds);
+		CGFloat topBleed = self.content.notched ? kTopBleed : 0.0;
 		if (self.panel) {
 			NSRect pf = NSEqualRects(self.lastRequestedFrame, NSZeroRect) ? self.panel.frame : self.lastRequestedFrame;
 			bodyW = MAX(bodyW, NSWidth(pf));
-			bodyH = MAX(bodyH, MAX(0, NSHeight(pf) - bandH));
+			bodyH = MAX(bodyH, MAX(0, NSHeight(pf) - (bandH + topBleed)));
 		}
 		NSRect expandedLocal = NSMakeRect(0, 0, bodyW, bodyH);
 		dict[@"bodyBounds"] = RectDict(expandedLocal);
@@ -4527,6 +4595,30 @@ static Napi::Value ValidatePathTopologyApi(const Napi::CallbackInfo &info) {
 	return result;
 }
 
+static Napi::Value CapturePanelSnapshot(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+	if (!gController) {
+		return env.Null();
+	}
+	__block NSData *pngData = nil;
+	if ([NSThread isMainThread]) {
+		pngData = [gController renderSnapshotPNG];
+	} else {
+		dispatch_sync(dispatch_get_main_queue(), ^{
+			pngData = [gController renderSnapshotPNG];
+		});
+	}
+	if (!pngData || pngData.length == 0) {
+		return env.Null();
+	}
+	if (info.Length() >= 1 && info[0].IsString()) {
+		std::string filePath = info[0].As<Napi::String>().Utf8Value();
+		NSString *nsPath = [NSString stringWithUTF8String:filePath.c_str()];
+		[pngData writeToFile:nsPath atomically:YES];
+	}
+	return Napi::Buffer<char>::Copy(env, (const char *)pngData.bytes, pngData.length);
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
 	exports.Set("setSnapshot", Napi::Function::New(env, SetSnapshot));
 	exports.Set("setPresentation", Napi::Function::New(env, SetPresentation));
@@ -4534,6 +4626,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 	exports.Set("getDiagnostics", Napi::Function::New(env, GetDiagnostics));
 	exports.Set("simulateAction", Napi::Function::New(env, SimulateAction));
 	exports.Set("validatePathTopology", Napi::Function::New(env, ValidatePathTopologyApi));
+	exports.Set("capturePanelSnapshot", Napi::Function::New(env, CapturePanelSnapshot));
 	exports.Set("dispose", Napi::Function::New(env, DisposeNative));
 	return exports;
 }

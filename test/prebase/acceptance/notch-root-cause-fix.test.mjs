@@ -179,26 +179,25 @@ test('shoulder flare creates body walls at bodyLeft/bodyRight below top edge', (
 		'bodyLeft must be inset from 0 by shoulder curve',
 	);
 
-	// The right wall drops from (totalW, 0) down to (bodyRight, shoulderDrop) —
-	// this is the LineTo that creates the shoulder transition.
+	// The right wall transitions from (totalW, visTopY) down to (bodyRight, visDrop) via smooth cubic flare.
 	assert.match(
 		block,
-		/CGPathAddLineToPoint\(path, NULL, bodyRight, shoulderDrop\)/,
-		'right body wall must drop to bodyRight at shoulderDrop height',
+		/bodyRight,\s*visDrop\)/,
+		'right shoulder must curve to bodyRight at visDrop height',
 	);
 
-	// Right wall: LineTo from (bodyRight, shoulderDrop) down to (bodyRight, currentH - effBottomR).
+	// Right wall: LineTo from (bodyRight, visDrop) down to (bodyRight, currentH - effBottomR).
 	assert.match(
 		block,
 		/CGPathAddLineToPoint\(path, NULL, bodyRight, currentH - effBottomR\)/,
 		'right body wall extends down to bottom corner start',
 	);
 
-	// Left wall: LineTo from (bodyLeft, currentH - effBottomR) UP to (bodyLeft, shoulderDrop).
+	// Left wall: LineTo from (bodyLeft, currentH - effBottomR) UP to (bodyLeft, visDrop).
 	// The bottom-left corner is a CurveTo endpoint, so the left wall vertical is an UP line.
 	assert.match(
 		block,
-		/CGPathAddLineToPoint\(path, NULL, bodyLeft, shoulderDrop\)/,
+		/CGPathAddLineToPoint\(path, NULL, bodyLeft, visDrop\)/,
 		'left body wall extends up to shoulder bottom',
 	);
 

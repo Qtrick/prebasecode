@@ -227,6 +227,30 @@
       "rootCause": "DEF-SHOT-01: screencapture -lwindowId captured giant desktop bounding boxes when shadow or window masks were applied, falling back to duplicate full-desktop screenshots for all fixtures.",
       "impact": "Individual panel screenshot artifacts had identical byte sizes and identical SHA-256 hashes.",
       "change": "Rewrote captureNativePanelScreenshot to directly capture the top-anchored panel rect (-Rx,0,w,h) at native 2x Retina scale, yielding truly distinct, isolated 2x PNGs for every single visual fixture."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-COORD-01: kTopBleed = 14 placed local y=0..14 off-screen above the display bezel, while containers assumed y=0 was the visible top edge and y=bandH was below the notch. In compact state, compactContainer at y=0 resulted in label glyphs being clipped by the physical display bezel. In expanded state, expandedContainer at y=bandH placed headers inside the physical notch housing behind the camera lens.",
+      "impact": "Top 4.5pt of compact wing glyphs clipped off by screen bezel, and expanded header overlapped the physical camera housing.",
+      "change": "Re-anchored containers to explicit coordinate space: compactContainer at (0, visTopY, totalW, bandH) with visTopY = topBleed (14pt), and expandedContainer / peekContainer at (0, notchBottomY, totalW, bodyH) with notchBottomY = topBleed + bandH (48pt)."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-SHOULDER-01: When topBleed was 14pt and shoulderDrop was 14pt, 100% of the shoulder flare occurred between y=0 and y=14 off-screen above the visible bezel. Below the bezel (y>=14), body walls were straight vertical lines, making the expanded panel appear as a disconnected, floating black card. Furthermore, right shoulder element 5 was an asymmetric diagonal line directly to (bodyRight, shoulderDrop).",
+      "impact": "Expanded panel looked like a floating card rather than an organic expansion of the physical notch housing, with an asymmetrical right shoulder cut.",
+      "change": "Reconstructed CreateNotchedIslandPath with a symmetric 14-element topology where shoulders flare onto the visible screen (visDrop = visTopY + shoulderDrop = 28pt). Element 5 anchors to (totalW, visTopY) and element 6 curves smoothly to (bodyRight, visDrop), with element 11 and 12 mirroring on the left."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-DETECT-01: ScreenHasPhysicalNotch had a blanket fallback `if (IsBuiltinScreen(screen)) return YES;` that erroneously reported non-notched MacBook Air and Touch Bar MacBook Pro screens as physically notched.",
+      "impact": "Non-notched built-in displays ran notched geometry with unwanted top bleed and wing padding.",
+      "change": "Removed blanket IsBuiltinScreen fallback; restricted resolution fallbacks strictly to built-in screens matching known Apple Silicon notch resolutions (1512x982, 1728x1117, 1470x956, 1710x1107)."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-SNAP-01: Repository relied exclusively on screencapture CLI and CDP renderer screenshots, which failed when Screen Recording permissions were missing or captured full desktop bounds instead of the native panel shape.",
+      "impact": "Inability to deterministically verify native NSPanel visual appearance across all 12 interaction states.",
+      "change": "Implemented renderSnapshotPNG on PrebaseLiveActivityController and exported capturePanelSnapshot via N-API, rendering layer-backed NSView hierarchy with CAShapeLayer masks directly to an offscreen NSBitmapImageRep PNG without requiring macOS TCC screen recording permissions."
     }
   ],
   "findingsRejected": [
