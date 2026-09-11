@@ -440,10 +440,9 @@ static SilhouetteShoulderMetrics ComputeSilhouetteShoulderMetrics(
 	BOOL isExpanded)
 {
 	SilhouetteShoulderMetrics metrics = {};
-	// Housing-anchored shoulder: the transition curve from housing edge to body wall.
-	// Compact uses minimal shoulders; expanded uses pronounced shoulders that flare
-	// the silhouette outward from the physical housing.
-	CGFloat effR = isExpanded ? 18.0 : 6.0;
+	// Authoritative single shoulder radius: 6pt shallow concave curve matching physical MacBook notch bezel.
+	// Preserves visual continuity from compact to expanded without exaggerated horizontal ears.
+	CGFloat effR = 6.0;
 	metrics.effShoulderR = effR;
 	metrics.opticalInset = effR + 2.0;
 	metrics.flare = effR;
@@ -451,6 +450,7 @@ static SilhouetteShoulderMetrics ComputeSilhouetteShoulderMetrics(
 	metrics.wingRightX = totalW - effR;
 	return metrics;
 }
+
 
 typedef NS_ENUM(NSInteger, PrebasePresentationState) {
 	PrebasePresentationStateHidden = 0,
@@ -551,8 +551,8 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// a natural downward growth from the physical notch, not a floating card.
 		//
 		// Element ordering matches compact for smooth CAShapeLayer morph (14 elements).
-		CGFloat shoulderDrop = 14.0; // subtle flare — body walls stay close to panel edges
-		CGFloat shoulderCurve = effShoulderR; // 18pt cubic bezier radius
+		CGFloat shoulderDrop = 8.0; // gentle 8pt drop matching bezel curvature
+		CGFloat shoulderCurve = effShoulderR; // 6pt cubic bezier radius
 		// Body walls inset only by the shoulder curve — no extra bottom-radius offset.
 		// This keeps the expanded body nearly full-width, anchored to the physical housing.
 		CGFloat bodyLeft = shoulderCurve;
@@ -2530,8 +2530,8 @@ static NSString *JSString(Napi::Value value) {
 		self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
 	CGFloat totalW = [self computeExpandedWidth:naturalW];
 	// Path-aware safe inset: body is full width, content inset is kContentInsetX + safe extra.
-	// Expanded shoulder radius is 18pt with pronounced flare — content needs more room.
-	CGFloat sideInset = ContentSafeInsetX(self.content.notched, 18.0, YES);
+	// Authoritative shoulder radius is 6pt matching physical MacBook bezel.
+	CGFloat sideInset = ContentSafeInsetX(self.content.notched, 6.0, YES);
 	CGFloat contentW = MAX(40, totalW - sideInset * 2);
 	CGFloat h = bandH + kContentInsetTop;
 	h += kHeaderRowHeight + kContentGap;
@@ -3058,6 +3058,11 @@ static NSString *JSString(Napi::Value value) {
 				if (strong.panel && !NSPointInRect(p, strong.panel.frame)) {
 					[strong collapseEmittingDismiss:YES];
 				}
+			} else if (!strong.content.expanded && strong.visible) {
+				NSPoint p = [NSEvent mouseLocation];
+				if (NSPointInRect(p, strong.collapsedHit)) {
+					[strong enterInteractiveSticky];
+				}
 			}
 		}];
 	}
@@ -3106,14 +3111,14 @@ static NSString *JSString(Napi::Value value) {
 		[NSEvent removeMonitor:self.globalMonitor];
 		self.globalMonitor = nil;
 	}
-	if (self.globalClickMonitor) {
-		[NSEvent removeMonitor:self.globalClickMonitor];
-		self.globalClickMonitor = nil;
-	}
 }
 
 - (void)removeMonitors {
 	[self removeGlobalMonitorOnly];
+	if (self.globalClickMonitor) {
+		[NSEvent removeMonitor:self.globalClickMonitor];
+		self.globalClickMonitor = nil;
+	}
 	[self removeLocalKeyMonitor];
 }
 
@@ -3240,6 +3245,10 @@ static NSString *JSString(Napi::Value value) {
 	self.exitTimer = nil;
 	self.panel.ignoresMouseEvents = NO;
 	self.ignoresMouse = NO;
+	[self.panel makeKeyAndOrderFront:nil];
+	if (self.input && self.input.window && !self.input.isHidden) {
+		[self.panel makeFirstResponder:self.input];
+	}
 	[self installLocalKeyMonitor];
 	[self removeGlobalMonitorOnly];
 	self.pendingPresentationMorph = YES;

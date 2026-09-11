@@ -143,8 +143,8 @@ test('Architecture: SolveInteractiveLayout and ComputeSilhouetteMetrics removed 
 		'Header must retain ComputeRightShoulderBezier (used by production)');
 	assert.match(layoutH, /ComputeLeftShoulderBezier/,
 		'Header must retain ComputeLeftShoulderBezier (used by production)');
-	assert.match(layoutH, /LayoutTokens/,
-		'Header must retain LayoutTokens (shared constant definitions)');
+	assert.doesNotMatch(layoutH, /LayoutTokens/,
+		'LayoutTokens struct must be removed (Ponytail cleanup: dead abstraction)');
 });
 
 test('Architecture: Single authoritative shoulder metrics — no duplicate ComputeSilhouetteMetrics', () => {
@@ -294,3 +294,66 @@ test('Text Containment: SanitizeTextForContainment handles pathological tokens',
 	assert.match(mm, /runLength\s*>=\s*24/,
 		'Must break mixed alphanumeric runs at 24 chars');
 });
+
+// 9. Quick Messaging & Minimized / Backgrounded Interaction
+test('Quick Messaging: Background/minimized click triggers sticky interactive and acquires key focus', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// Global click monitor handles clicks inside collapsedHit when not expanded
+	assert.match(mm, /else\s+if\s*\(!strong\.content\.expanded\s*&&\s*strong\.visible\)\s*\{[\s\S]*NSPointInRect\(p,\s*strong\.collapsedHit\)\)\s*\{[\s\S]*enterInteractiveSticky/,
+		'Global click monitor must allow clicks on collapsed notch to enter interactive sticky mode');
+
+	// expandInteractive makes panel key and focuses input for immediate typing
+	assert.match(mm, /makeKeyAndOrderFront:nil/,
+		'expandInteractive must make panel key window');
+	assert.match(mm, /makeFirstResponder:self\.input/,
+		'expandInteractive must make self.input the first responder');
+
+	// globalClickMonitor must be retained across expand transitions to collapse on outside click
+	assert.doesNotMatch(mm, /removeGlobalMonitorOnly\s*\{[^}]*self\.globalClickMonitor/,
+		'removeGlobalMonitorOnly must not destroy globalClickMonitor (only removeMonitors cleans it up)');
+});
+
+// 10. Session Switching & Empty New Session Persistence
+test('Session Management: Newly created sessions persist in switcher and attach Magnus agent', () => {
+	const ts = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
+	const sessionTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts'), 'utf8');
+
+	// _createdMagnusSessionIds set tracks sessions created via notch
+	assert.match(ts, /_createdMagnusSessionIds\s*=\s*new\s+Set<string>\(\)/,
+		'Contribution must maintain _createdMagnusSessionIds set');
+
+	// createSession adds to _createdMagnusSessionIds
+	assert.match(ts, /command\.kind\s*===\s*'createSession'[\s\S]*_createdMagnusSessionIds\.add\(model\.sessionId\)/,
+		'createSession must add session id to _createdMagnusSessionIds');
+
+	// listMagnusSessions includes created sessions even if model has 0 requests
+	assert.match(ts, /isCreatedMagnus\s*=\s*createdMagnusSessionIds\s*!==\s*undefined\s*&&\s*createdMagnusSessionIds\.has\(model\.sessionId\)/,
+		'listMagnusSessions must retain created Magnus sessions');
+
+	// selectSession finds created sessions even if unselected
+	assert.match(ts, /this\._createdMagnusSessionIds\.has\(m\.sessionId\)/,
+		'selectSession must allow selecting created Magnus sessions');
+
+	// First followUp attaches prebase.magnus.agent
+	assert.match(sessionTs, /const\s+options\s*=\s*isInitialRequest\s*\?\s*\{\s*agentId:\s*'prebase\.magnus\.agent'\s*\}\s*:\s*undefined/,
+		'First follow-up must attach prebase.magnus.agent');
+});
+
+// 11. Authoritative 6pt Shoulder Geometry Alignment
+test('Shoulder Geometry: Single authoritative 6pt shoulder across native, calculation, and contracts', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// ComputeSilhouetteShoulderMetrics sets effR = 6.0
+	assert.match(mm, /CGFloat\s+effR\s*=\s*6\.0;/,
+		'Authoritative shoulder radius must be 6.0pt');
+
+	// computeTargetContentHeight uses 6.0
+	assert.match(mm, /ContentSafeInsetX\(self\.content\.notched,\s*6\.0,\s*YES\)/,
+		'computeTargetContentHeight must use authoritative 6.0pt shoulder');
+
+	// CreateNotchedIslandPath uses 8.0 drop and effShoulderR
+	assert.match(mm, /shoulderDrop\s*=\s*8\.0;/,
+		'Expanded shoulder drop must be 8.0pt');
+});
+

@@ -86,17 +86,18 @@ function selectPrimaryMagnusModel(models: Iterable<IChatModel>): IChatModel | un
 }
 
 /** List all active Magnus sessions for notch session switcher. */
-function listMagnusSessions(models: Iterable<IChatModel>, selectedSessionId?: string): { sessionId: string; sessionResource: string; title: string; isBusy: boolean; lastMessageDate: number }[] {
+function listMagnusSessions(models: Iterable<IChatModel>, selectedSessionId?: string, createdMagnusSessionIds?: ReadonlySet<string>): { sessionId: string; sessionResource: string; title: string; isBusy: boolean; lastMessageDate: number }[] {
 	const result: { sessionId: string; sessionResource: string; title: string; isBusy: boolean; lastMessageDate: number }[] = [];
 	for (const model of models) {
 		const isCanonicalSelected = selectedSessionId !== undefined && model.sessionId === selectedSessionId;
-		if (!isMagnusModel(model) && !isCanonicalSelected) {
+		const isCreatedMagnus = createdMagnusSessionIds !== undefined && createdMagnusSessionIds.has(model.sessionId);
+		if (!isMagnusModel(model) && !isCanonicalSelected && !isCreatedMagnus) {
 			continue;
 		}
 		result.push({
 			sessionId: model.sessionId,
 			sessionResource: model.sessionResource.toString(),
-			title: model.title || (isCanonicalSelected && model.getRequests().length === 0 ? 'New Magnus Session' : 'Untitled session'),
+			title: model.title || ((isCanonicalSelected || isCreatedMagnus) && model.getRequests().length === 0 ? 'New Magnus Session' : 'Untitled session'),
 			isBusy: model.requestInProgress.get() || model.hasActiveRequest.get() || Boolean(model.requestNeedsInput.get()),
 			lastMessageDate: model.lastMessageDate,
 		});
@@ -341,6 +342,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 	private _selectedSessionId: string | undefined;
 	private _selectedSessionResource: string | undefined;
 	private readonly _actionLedger = new Map<string, MagnusLiveActivityAction>();
+	private readonly _createdMagnusSessionIds = new Set<string>();
 	private readonly _modelListeners = this._register(new DisposableStore());
 	private readonly _push: RunOnceScheduler;
 	private readonly _completionTimer: RunOnceScheduler;
@@ -534,7 +536,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		if (this._selectedSessionId) {
 			model = allModels.find(m => m.sessionId === this._selectedSessionId);
 			if (model) {
-				if (!isMagnusModel(model) && model.getRequests().length > 0) {
+				if (!isMagnusModel(model) && model.getRequests().length > 0 && !this._createdMagnusSessionIds.has(model.sessionId)) {
 					// Non-Magnus requests finished on this session; reset canonical selection
 					this._selectedSessionId = undefined;
 					this._selectedSessionResource = undefined;
@@ -552,7 +554,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 				this._selectedSessionResource = model.sessionResource.toString();
 			}
 		}
-		const availableSessions = listMagnusSessions(allModels, this._selectedSessionId);
+		const availableSessions = listMagnusSessions(allModels, this._selectedSessionId, this._createdMagnusSessionIds);
 		this._revision += 1;
 		const userHideDetails = Boolean(this.configurationService.getValue<boolean>('prebase.magnus.liveActivity.hideDetails'));
 		const sessionId = model?.sessionId;
@@ -710,9 +712,9 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			const allModels = Array.from(this.chatService.chatModels.get());
 			let targetModel: IChatModel | undefined;
 			if (targetSessionId) {
-				targetModel = allModels.find(m => m.sessionId === targetSessionId && (isMagnusModel(m) || m.sessionId === this._selectedSessionId));
+				targetModel = allModels.find(m => m.sessionId === targetSessionId && (isMagnusModel(m) || this._createdMagnusSessionIds.has(m.sessionId) || m.sessionId === this._selectedSessionId));
 			} else if (targetResourceStr) {
-				targetModel = allModels.find(m => m.sessionResource.toString() === targetResourceStr && (isMagnusModel(m) || m.sessionId === this._selectedSessionId));
+				targetModel = allModels.find(m => m.sessionResource.toString() === targetResourceStr && (isMagnusModel(m) || this._createdMagnusSessionIds.has(m.sessionId) || m.sessionId === this._selectedSessionId));
 			}
 			if (targetModel) {
 				this._selectedSessionId = targetModel.sessionId;
@@ -729,6 +731,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			const ref = this.chatService.startNewLocalSession(ChatAgentLocation.Chat);
 			try {
 				const model = ref.object;
+				this._createdMagnusSessionIds.add(model.sessionId);
 				this._selectedSessionId = model.sessionId;
 				this._selectedSessionResource = model.sessionResource.toString();
 				await this.chatWidgetService.openSession(model.sessionResource);
@@ -744,6 +747,14 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			logService: this.logService,
 			onInteractionApplied: () => this._push.schedule(),
 		});
+	}
+
+	public get selectedSessionId(): string | undefined {
+		return this._selectedSessionId;
+	}
+
+	public get createdMagnusSessionIds(): ReadonlySet<string> {
+		return this._createdMagnusSessionIds;
 	}
 
 	public refresh(): void {
@@ -954,7 +965,7 @@ registerAction2(class extends Action2 {
 	}
 	run(accessor: ServicesAccessor) {
 		const chatService = accessor.get(IChatService);
-		return listMagnusSessions(chatService.chatModels.get());
+		return listMagnusSessions(chatService.chatModels.get(), MagnusLiveActivityContribution.instance?.selectedSessionId, MagnusLiveActivityContribution.instance?.createdMagnusSessionIds);
 	}
 });
 

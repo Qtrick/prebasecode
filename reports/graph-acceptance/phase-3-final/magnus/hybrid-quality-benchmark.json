@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-11T18:55:11.666Z",
+  "at": "2026-09-11T20:26:48.849Z",
   "mode": "deterministic-fixtures",
   "note": "Compares LinkUp snippet-only envelopes with LinkUp+Firecrawl hybrid on the same ranked URLs. Not a live provider score.",
   "rows": [
@@ -81,7 +81,7 @@
         "payloadChars": 251,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 0,
+        "latencyMs": 1,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://github.com/microsoft/vscode/issues/1"
@@ -111,7 +111,7 @@
         "payloadChars": 252,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 1,
+        "latencyMs": 0,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://arxiv.org/pdf/1706.03762"

@@ -119,6 +119,16 @@ export function extractTranscriptFromModel(
 					responseText += part.content.value;
 				}
 			}
+			if (!responseText.trim()) {
+				const fallbackValue = (req.response as unknown as { response?: { value?: unknown } }).response?.value;
+				if (typeof fallbackValue === 'string') {
+					responseText = fallbackValue;
+				} else if (Array.isArray(fallbackValue)) {
+					responseText = fallbackValue
+						.map(p => typeof p === 'string' ? p : (p && typeof p === 'object' && 'value' in p ? String((p as { value: unknown }).value) : ''))
+						.join('');
+				}
+			}
 			responseText = responseText.trim();
 			if (responseText) {
 				const sanitized = redactLiveActivityText(responseText).slice(0, maxChars);

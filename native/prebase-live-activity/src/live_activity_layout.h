@@ -14,22 +14,6 @@ namespace live_activity {
 /** Kappa constant for cubic Bezier approximation of circular arcs. */
 static constexpr CGFloat kKappa = 0.5522847498307933984022516322796;
 
-/** Layout tokens and metrics. */
-struct LayoutTokens {
-	static constexpr CGFloat kHeaderRowHeight = 16.0;
-	static constexpr CGFloat kContentGap = 3.0;
-	static constexpr CGFloat kContentInsetTop = 6.0;
-	static constexpr CGFloat kContentFooterGutter = 8.0;
-	static constexpr CGFloat kControlHeight = 28.0;
-	static constexpr CGFloat kIconControlSize = 28.0;
-	static constexpr CGFloat kControlGap = 6.0;
-	static constexpr CGFloat kActionRowHeight = 15.0;
-	static constexpr CGFloat kComposerCornerRadius = 12.0;
-	static constexpr CGFloat kBottomCornerRadius = 18.0;
-	static constexpr CGFloat kContentMinScrollHeight = 24.0;
-	static constexpr CGFloat kExpandedHeightMin = 72.0;
-	static constexpr CGFloat kExpandedHeightMax = 220.0;
-};
 
 /** Cubic Bezier control points for C1 tangent-continuous concave shoulder. */
 struct ConcaveShoulderBezier {

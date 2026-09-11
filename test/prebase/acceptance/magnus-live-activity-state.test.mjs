@@ -404,9 +404,8 @@ assert.ok(snap.recentActions.every(a => typeof a.label === 'string' && a.label.l
 
 test('native notch polish contracts: optical shoulder, true viewport, action id reconcile, footer gutter', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
-	assert.match(native, /kOpticalShoulderInsetMin\b.*=\s*8/);
-	// effShoulderR is now dynamic: 18pt for expanded (housing-anchored flare), 6pt for compact
-	assert.match(native, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/);
+	// effShoulderR is authoritative 6pt matching physical MacBook bezel curve
+	assert.match(native, /CGFloat effR = 6\.0;/);
 	assert.match(native, /kContentFooterGutter = 8/);
 	assert.match(native, /colorWithCalibratedWhite:0\.0 alpha:1\.0/);
 	assert.match(native, /shapeMaskLayer/);
@@ -614,11 +613,11 @@ test('premium control dimensions contract: 28pt controls, 12pt composer radius, 
 		'composer corner radius must be 12pt (was 10 — upgraded for softer feel)');
 	assert.doesNotMatch(native, /kComposerCornerRadius = 10[^0-9]/,
 		'old 10pt composer radius must not appear in code');
-	// Shoulder radius is now 18pt for expanded (housing-anchored flare), 6pt for compact
-	assert.match(native, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/,
-		'expanded shoulder must be 18pt, compact must be 6pt');
-	assert.doesNotMatch(native, /CGFloat effR = 6\.0;/,
-		'expanded must NOT use the old flat 6pt shoulder');
+	// Shoulder radius is authoritative 6pt matching physical MacBook bezel curve
+	assert.match(native, /CGFloat effR = 6\.0;/,
+		'authoritative shoulder radius must be 6pt');
+	assert.doesNotMatch(native, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/,
+		'shoulder radius must not have contradictory 18pt expanded branch');
 	// Steep Bezier tangent for shallow shoulders (kKappa ≈ 0.552)
 	assert.match(native, /kKappa = 0\.55/,
 		'shoulder Bezier CP must use kKappa tangent offset');
@@ -654,19 +653,19 @@ test('expanded geometry: full-width top edge with housing-to-body shoulder flare
 		'expanded top-right must span to totalW');
 
 	// Shoulder flare creates housing-to-body transition below the top edge
-	assert.match(expandedBlock, /shoulderDrop = 14\.0/);
+	assert.match(expandedBlock, /shoulderDrop = 8\.0/);
 	assert.match(expandedBlock, /shoulderCurve = effShoulderR/);
 	assert.match(expandedBlock, /full-width top edge/);
 });
 
-test('expanded shoulder radius is 18pt for housing-anchored flare', () => {
+test('expanded shoulder radius is authoritative 6pt matching physical bezel', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	const computeBlock = native.slice(
 		native.indexOf('ComputeSilhouetteShoulderMetrics'),
 		native.indexOf('return metrics'),
 	);
-	// Expanded: 18pt shoulder; Compact: 6pt shoulder
-	assert.match(computeBlock, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/);
+	// Authoritative single shoulder radius: 6pt
+	assert.match(computeBlock, /CGFloat effR = 6\.0;/);
 	assert.match(computeBlock, /metrics\.effShoulderR = effR/);
 	assert.match(computeBlock, /metrics\.opticalInset = effR/);
 	assert.match(computeBlock, /metrics\.flare = effR/);
@@ -753,9 +752,9 @@ test('expanded body walls stay close to panel edges for physical notch attachmen
 		'expanded bodyLeft must be shoulderCurve (no extra bottom-radius offset)');
 	assert.match(expandedBlock, /bodyRight = totalW - shoulderCurve/,
 		'expanded bodyRight must be totalW - shoulderCurve');
-	// Shoulder drop should be subtle (14pt, not 20pt)
-	assert.match(expandedBlock, /shoulderDrop = 14\.0/,
-		'shoulderDrop must be 14pt for subtle flare');
+	// Shoulder drop should be gentle (8pt, matching bezel curvature)
+	assert.match(expandedBlock, /shoulderDrop = 8\.0/,
+		'shoulderDrop must be 8pt for subtle flare');
 });
 
 test('malformed response recovery uses simplified retry strategy', () => {
@@ -1028,7 +1027,7 @@ test('new Magnus session: initial followUp attaches agentId prebase.magnus.agent
 		'createSession must assign newly created session as canonical selected session');
 
 	// listMagnusSessions includes newly created canonical session with title 'New Magnus Session'
-	assert.match(contribTs, /function listMagnusSessions\(models: Iterable<IChatModel>, selectedSessionId\?: string\)/,
+	assert.match(contribTs, /function listMagnusSessions\(models: Iterable<IChatModel>, selectedSessionId\?: string/,
 		'listMagnusSessions must accept selectedSessionId');
 	assert.match(contribTs, /'New Magnus Session'/,
 		'Empty canonical selected session must display "New Magnus Session" in switcher');
