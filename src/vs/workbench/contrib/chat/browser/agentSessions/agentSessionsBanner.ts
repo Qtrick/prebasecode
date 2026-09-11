@@ -12,6 +12,7 @@ import { IChatEntitlementService } from '../../../../services/chat/common/chatEn
 
 import product from '../../../../../platform/product/common/product.js';
 import { OPEN_WORKSPACE_IN_AGENTS_WINDOW_COMMAND_ID } from '../../common/constants.js';
+import { isAgentsWindowEnabled } from '../../common/agentsWindowCapability.js';
 
 
 type AgentsBannerClickedEvent = {
@@ -39,6 +40,9 @@ export interface IAgentsBannerResult {
  */
 export function canShowAgentsBanner(chatEntitlementService: IChatEntitlementService): boolean {
 	if (product.prebaseAgentsWindowEnabled === false) {
+		return false;
+	}
+	if (!isAgentsWindowEnabled(product)) {
 		return false;
 	}
 	const sentiment = chatEntitlementService.sentiment;

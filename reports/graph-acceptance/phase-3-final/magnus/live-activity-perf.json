@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "24771d5aadc34d089af92ff1928d39dd854396dd",
-  "sourceFingerprint": "00edff02ae6a8808196fdbc86cd2cf72d41b67942dcee1ba8b0a3626fe958870",
-  "productFingerprint": "00edff02ae6a8808196fdbc86cd2cf72d41b67942dcee1ba8b0a3626fe958870",
-  "generatedAt": "2026-09-10T19:46:47.834Z",
+  "sourceHead": "93bb60808871a15e1f3ae3bc846407deeb8b93b5",
+  "sourceFingerprint": "ecda02ff4a60661191dde8f59a352bd2af2165b12618a41de14ed5362c43fd34",
+  "productFingerprint": "ecda02ff4a60661191dde8f59a352bd2af2165b12618a41de14ed5362c43fd34",
+  "generatedAt": "2026-09-11T14:27:30.812Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -112,7 +112,7 @@
           "questionButtonLabels": [],
           "rawTopAnchorDelta": -14,
           "prebaseFullscreen": false,
-          "windowNumber": 67955,
+          "windowNumber": 69362,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -129,7 +129,7 @@
           "revision": 1,
           "hoverSessionToken": 0,
           "shapeMaskSynced": true,
-          "buildFingerprint": "native-vSep 10 2026-15:36:36",
+          "buildFingerprint": "native-vSep 11 2026-10:23:49",
           "composerFrame": null,
           "screenLocalizedName": "Built-in Retina Display",
           "pendingMessageFullyVisible": true,
@@ -179,7 +179,7 @@
               "height": 0
             }
           ],
-          "buildTimestamp": "Sep 10 2026 15:36:36",
+          "buildTimestamp": "Sep 11 2026 10:23:49",
           "auxiliaryTopLeftArea": {
             "y": 950,
             "x": 0,
@@ -190,13 +190,14 @@
           "exitGraceMs": 250,
           "denyButtonAccessibilityLabel": "Deny",
           "optionButtonFrames": [],
-          "hoverHapticCount": 0,
+          "conversationTranscriptCount": 0,
           "screenFrame": {
             "y": 0,
             "x": 0,
             "width": 1512,
             "height": 982
           },
+          "hoverHapticCount": 0,
           "latestMessageFrame": null,
           "buildSourceFile": "../src/live_activity.mm",
           "renderedLatestMessage": "",
@@ -217,6 +218,7 @@
           "contentScrollViewVisible": false,
           "activeInputControl": "none",
           "pendingTitle": "",
+          "sessionButtonVisible": false,
           "userDismissedAttention": false,
           "statusLabel": "Working",
           "footerTopY": 0,
@@ -225,7 +227,7 @@
           "actionInFlight": false,
           "topBleed": 14,
           "screenTopY": 982,
-          "geometrySignature": "e=0;p=0;pin=0;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+          "geometrySignature": "e=0;p=0;pin=0;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=0;tc=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
           "approveDenyVisible": false,
           "redrawCount": 1,
           "shapeAwareHitTesting": true,
@@ -236,6 +238,7 @@
           "accessibilityLabel": "Working",
           "interactionId": "",
           "orderFrontCount": 1,
+          "sessionTitle": "",
           "shoulderMetrics": {
             "topLeftX": 6,
             "topRightX": 307,
@@ -283,8 +286,9 @@
             "width": 0,
             "height": 0
           },
-          "geometryTransitionCount": 1,
           "peekContainerAlpha": 0,
+          "geometryTransitionCount": 1,
+          "availableSessionCount": 0,
           "peekLabelVisible": false,
           "pinButtonVisible": false,
           "headerFrame": {
@@ -312,7 +316,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9443,
+        "durationRealCyclesMs": 9187,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -396,7 +400,7 @@
           "questionButtonLabels": [],
           "rawTopAnchorDelta": -14,
           "prebaseFullscreen": false,
-          "windowNumber": 67955,
+          "windowNumber": 69362,
           "openButtonFrame": {
             "y": 69,
             "x": 291,
@@ -418,7 +422,7 @@
           "globalMonitorInstalled": false,
           "lastTransitionReason": "geometry",
           "approveButtonAlpha": 1,
-          "inactiveSubtreesSuppressed": true,
+          "inactiveSubtreesSuppressed": false,
           "renderedPeekBody": "",
           "revision": 406,
           "hoverSessionToken": 0,
@@ -430,7 +434,7 @@
             "width": 221,
             "height": 28
           },
-          "buildFingerprint": "native-vSep 10 2026-15:36:36",
+          "buildFingerprint": "native-vSep 11 2026-10:23:49",
           "screenLocalizedName": "Built-in Retina Display",
           "pendingMessageFullyVisible": true,
           "accessibilityRole": "AXGroup",
@@ -467,7 +471,7 @@
               "height": 15
             }
           ],
-          "buildTimestamp": "Sep 10 2026 15:36:36",
+          "buildTimestamp": "Sep 11 2026 10:23:49",
           "auxiliaryTopLeftArea": {
             "y": 950,
             "x": 0,
@@ -478,13 +482,14 @@
           "exitGraceMs": 250,
           "denyButtonAccessibilityLabel": "Deny",
           "optionButtonFrames": [],
-          "hoverHapticCount": 0,
+          "conversationTranscriptCount": 0,
           "screenFrame": {
             "y": 0,
             "x": 0,
             "width": 1512,
             "height": 982
           },
+          "hoverHapticCount": 0,
           "latestMessageFrame": null,
           "buildSourceFile": "../src/live_activity.mm",
           "renderedLatestMessage": "",
@@ -505,6 +510,7 @@
           "contentScrollViewVisible": true,
           "activeInputControl": "input-ready",
           "pendingTitle": "",
+          "sessionButtonVisible": false,
           "userDismissedAttention": false,
           "statusLabel": "Working",
           "footerTopY": 69,
@@ -513,10 +519,10 @@
           "actionInFlight": false,
           "topBleed": 14,
           "screenTopY": 982,
-          "geometrySignature": "e=1;p=0;pin=0;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=1;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+          "geometrySignature": "e=1;p=0;pin=0;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=1;tc=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
           "approveDenyVisible": false,
-          "redrawCount": 201,
           "shapeAwareHitTesting": true,
+          "redrawCount": 201,
           "questionContentHealthy": true,
           "renderedActivityText": "Validating Temporal layout recovery",
           "contentDocumentHeight": 42,
@@ -525,6 +531,7 @@
           "accessibilityLabel": "Working",
           "interactionId": "",
           "orderFrontCount": 1,
+          "sessionTitle": "",
           "shoulderMetrics": {
             "topLeftX": 18,
             "topRightX": 331,
@@ -561,7 +568,7 @@
           "panelLevel": 2147483630,
           "expandedContentAlpha": 1,
           "denyButtonTitle": "Deny",
-          "compactContainerVisible": false,
+          "compactContainerVisible": true,
           "actionRowIds": [
             "a99"
           ],
@@ -570,8 +577,9 @@
           "canonicalPresentationState": "interactiveWorking",
           "contentRefreshCount": 302,
           "pendingTitleFrame": null,
-          "geometryTransitionCount": 201,
           "peekContainerAlpha": 0,
+          "geometryTransitionCount": 201,
+          "availableSessionCount": 0,
           "peekLabelVisible": false,
           "pinButtonVisible": true,
           "headerFrame": {
@@ -599,7 +607,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 360,
+        "durationRetargetMs": 357,
         "diagRetarget": {
           "renderedPendingMessage": "",
           "animationCount": 203,
@@ -669,7 +677,7 @@
           "questionButtonLabels": [],
           "rawTopAnchorDelta": -14,
           "prebaseFullscreen": false,
-          "windowNumber": 67955,
+          "windowNumber": 69362,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -686,7 +694,7 @@
           "revision": 406,
           "hoverSessionToken": 0,
           "shapeMaskSynced": true,
-          "buildFingerprint": "native-vSep 10 2026-15:36:36",
+          "buildFingerprint": "native-vSep 11 2026-10:23:49",
           "composerFrame": null,
           "screenLocalizedName": "Built-in Retina Display",
           "pendingMessageFullyVisible": true,
@@ -717,7 +725,7 @@
             "height": 32
           },
           "actionFrames": [],
-          "buildTimestamp": "Sep 10 2026 15:36:36",
+          "buildTimestamp": "Sep 11 2026 10:23:49",
           "auxiliaryTopLeftArea": {
             "y": 950,
             "x": 0,
@@ -728,13 +736,14 @@
           "exitGraceMs": 250,
           "denyButtonAccessibilityLabel": "Deny",
           "optionButtonFrames": [],
-          "hoverHapticCount": 0,
+          "conversationTranscriptCount": 0,
           "screenFrame": {
             "y": 0,
             "x": 0,
             "width": 1512,
             "height": 982
           },
+          "hoverHapticCount": 0,
           "latestMessageFrame": null,
           "buildSourceFile": "../src/live_activity.mm",
           "renderedLatestMessage": "",
@@ -755,6 +764,7 @@
           "contentScrollViewVisible": false,
           "activeInputControl": "none",
           "pendingTitle": "",
+          "sessionButtonVisible": false,
           "userDismissedAttention": false,
           "statusLabel": "Working",
           "footerTopY": 24,
@@ -763,7 +773,7 @@
           "actionInFlight": false,
           "topBleed": 14,
           "screenTopY": 982,
-          "geometrySignature": "e=1;p=1;pin=0;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=1;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+          "geometrySignature": "e=1;p=1;pin=0;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=1;tc=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
           "approveDenyVisible": false,
           "redrawCount": 203,
           "shapeAwareHitTesting": true,
@@ -774,6 +784,7 @@
           "accessibilityLabel": "Working",
           "interactionId": "",
           "orderFrontCount": 1,
+          "sessionTitle": "",
           "shoulderMetrics": {
             "topLeftX": 18,
             "topRightX": 295,
@@ -817,8 +828,9 @@
           "canonicalPresentationState": "peek",
           "contentRefreshCount": 304,
           "pendingTitleFrame": null,
-          "geometryTransitionCount": 203,
           "peekContainerAlpha": 1,
+          "geometryTransitionCount": 203,
+          "availableSessionCount": 0,
           "peekLabelVisible": true,
           "pinButtonVisible": false,
           "headerFrame": null,
@@ -863,7 +875,7 @@
         "attentionWhileInteractive": {
           "state": "attentionInteractive",
           "pendingMessage": "Edit live_activity.mm?",
-          "renderedPendingMessage": "Edit live_activity.mm​?",
+          "renderedPendingMessage": "Edit live_activity.mm?​",
           "localMonitor": true
         },
         "dismissDiag": {
@@ -904,12 +916,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -106,
-        "heapUsedMb": 6.68,
-        "rssDiffKb": 45440,
-        "rssMb": 117.08,
-        "cpuDeltaUserMs": 1396421,
-        "cpuDeltaSystemMs": 226771
+        "heapDiffKb": -126,
+        "heapUsedMb": 6.67,
+        "rssDiffKb": 53232,
+        "rssMb": 125.56,
+        "cpuDeltaUserMs": 1002625,
+        "cpuDeltaSystemMs": 197516
       }
     },
     {
@@ -1170,7 +1182,7 @@
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 13,
-          "contentRefreshCount": 15,
+          "contentRefreshCount": 16,
           "orderFrontCount": 1,
           "lastRenderedRevision": 1512,
           "revision": 1512,
@@ -1199,7 +1211,7 @@
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 13,
-            "contentRefreshCount": 16,
+            "contentRefreshCount": 17,
             "orderFrontCount": 1,
             "lastRenderedRevision": 1512,
             "revision": 1512,
@@ -1227,7 +1239,7 @@
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 43,
-            "contentRefreshCount": 46,
+            "contentRefreshCount": 47,
             "orderFrontCount": 1,
             "lastRenderedRevision": 1629,
             "revision": 1629,
@@ -1703,9 +1715,9 @@
           "state": "peek",
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 947,
             "width": 313,
-            "height": 48,
+            "height": 49,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1719,10 +1731,10 @@
         "interactive": {
           "state": "interactive",
           "frame": {
-            "x": 599,
-            "y": 948,
-            "width": 313,
-            "height": 48,
+            "x": 598,
+            "y": 944,
+            "width": 314,
+            "height": 52,
             "isActual": true,
             "requested": {
               "x": 581,
@@ -1736,10 +1748,10 @@
           "state": "pinned",
           "pinned": true,
           "frame": {
-            "x": 599,
-            "y": 948,
-            "width": 313,
-            "height": 48,
+            "x": 587,
+            "y": 878,
+            "width": 337,
+            "height": 118,
             "isActual": true,
             "requested": {
               "x": 581,
@@ -1753,9 +1765,9 @@
           "state": "attentionPeek",
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 916,
             "width": 313,
-            "height": 48,
+            "height": 80,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1770,9 +1782,9 @@
           "userDismissedAttention": true,
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 916,
             "width": 313,
-            "height": 48,
+            "height": 80,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1786,9 +1798,9 @@
           "state": "completedTransient",
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 946,
             "width": 313,
-            "height": 48,
+            "height": 50,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1907,7 +1919,7 @@
             "questionButtonCount": 0
           },
           "long-pending": {
-            "height": 156,
+            "height": 157,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1924,7 +1936,7 @@
             "questionButtonCount": 0
           },
           "long-options": {
-            "height": 156,
+            "height": 158,
             "containment": {
               "ok": true,
               "frameCount": 8,
@@ -2054,8 +2066,8 @@
           },
           "approveButtonFrame": {
             "y": 84,
-            "x": 176,
-            "width": 191,
+            "x": 202,
+            "width": 165,
             "height": 28
           },
           "pendingMessageFrame": {
@@ -2194,7 +2206,7 @@
           "D"
         ],
         "framesStable": true,
-        "geometrySignature": "e=1;p=0;pin=1;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=3;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0"
+        "geometrySignature": "e=1;p=0;pin=1;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=3;tc=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0"
       }
     },
     {
@@ -2203,7 +2215,7 @@
       "details": {
         "animDelta": 0,
         "geoDelta": 0,
-        "geometrySignature": "e=1;p=0;pin=1;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=2;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+        "geometrySignature": "e=1;p=0;pin=1;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=2;tc=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
         "updates": 100,
         "composerStable": true,
         "scrollStable": true
@@ -2276,14 +2288,14 @@
           "pendingMessageFullyVisible": true,
           "approveButtonFrame": {
             "y": 71,
-            "x": 176,
-            "width": 191,
+            "x": 202,
+            "width": 165,
             "height": 28
           },
           "denyButtonFrame": {
             "y": 71,
             "x": 30,
-            "width": 138,
+            "width": 164,
             "height": 28
           }
         }
@@ -2526,13 +2538,13 @@
       "ok": true,
       "details": {
         "streaming": {
-          "baseSig": "e=1;p=0;pin=1;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
-          "postStreamSig": "e=1;p=0;pin=1;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+          "baseSig": "e=1;p=0;pin=1;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=0;tc=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+          "postStreamSig": "e=1;p=0;pin=1;att=0;st=working;kind=;id=;opts=0;appr=0;dest=0;acts=0;tc=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
           "animDelta": 0,
           "frameEqual": true
         },
         "semanticTransition": {
-          "postSemanticSig": "e=1;p=0;pin=1;att=0;st=completed;kind=;id=;opts=0;appr=0;dest=0;acts=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+          "postSemanticSig": "e=1;p=0;pin=1;att=0;st=completed;kind=;id=;opts=0;appr=0;dest=0;acts=0;tc=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
           "postSemanticH": 100
         }
       }
@@ -2548,14 +2560,14 @@
           "openVisible": false,
           "approveFrame": {
             "y": 71,
-            "x": 176,
-            "width": 191,
+            "x": 202,
+            "width": 165,
             "height": 28
           },
           "denyFrame": {
             "y": 71,
             "x": 30,
-            "width": 138,
+            "width": 164,
             "height": 28
           },
           "panelFrame": {
@@ -2652,13 +2664,13 @@
         "denyFrame": {
           "y": 71,
           "x": 30,
-          "width": 138,
+          "width": 164,
           "height": 28
         },
         "approveFrame": {
           "y": 71,
-          "x": 176,
-          "width": 191,
+          "x": 202,
+          "width": 165,
           "height": 28
         },
         "composerVisible": false,
@@ -2948,14 +2960,14 @@
         "approval": {
           "approveFrame": {
             "y": 53,
-            "x": 176,
-            "width": 191,
+            "x": 202,
+            "width": 165,
             "height": 28
           },
           "denyFrame": {
             "y": 53,
             "x": 30,
-            "width": 138,
+            "width": 164,
             "height": 28
           },
           "panelFrame": {
@@ -3086,9 +3098,9 @@
           "state": "terminalFailed"
         },
         "provenance": {
-          "buildTimestamp": "Sep 10 2026 15:36:36",
+          "buildTimestamp": "Sep 11 2026 10:23:49",
           "buildSourceFile": "../src/live_activity.mm",
-          "buildFingerprint": "native-vSep 10 2026-15:36:36"
+          "buildFingerprint": "native-vSep 11 2026-10:23:49"
         }
       }
     }

@@ -2,6 +2,7 @@
 #import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <QuartzCore/QuartzCore.h>
+#import "live_activity_layout.h"
 
 // Dynamic geometry metrics — native is authoritative for production silhouette/layout.
 static const CGFloat kCollapsedHeight = 34;
@@ -569,11 +570,13 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// 5. LineTo: right wall top — drop through top bleed to visible bezel anchor
 		CGPathAddLineToPoint(path, NULL, totalW, visTopY);
 
-		// 6. CurveTo: RIGHT SHOULDER — smooth cubic flare from (totalW, visTopY) to (bodyRight, visDrop)
+		// 6. CurveTo: RIGHT SHOULDER — C1 tangent continuous cubic flare from (totalW, visTopY) to (bodyRight, visDrop)
+		prebase::live_activity::ConcaveShoulderBezier rShoulder =
+			prebase::live_activity::ComputeRightShoulderBezier(totalW, bodyRight, visTopY, visDrop);
 		CGPathAddCurveToPoint(path, NULL,
-			totalW, visTopY + shoulderDrop * 0.45,
-			bodyRight + (totalW - bodyRight) * 0.20, visDrop,
-			bodyRight, visDrop);
+			rShoulder.cp1.x, rShoulder.cp1.y,
+			rShoulder.cp2.x, rShoulder.cp2.y,
+			rShoulder.p3.x, rShoulder.p3.y);
 
 		// 7. LineTo: down right wall to bottom-right corner start
 		CGPathAddLineToPoint(path, NULL, bodyRight, currentH - effBottomR);
@@ -596,11 +599,13 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// 11. LineTo: up left wall to left shoulder bottom
 		CGPathAddLineToPoint(path, NULL, bodyLeft, visDrop);
 
-		// 12. CurveTo: LEFT SHOULDER — smooth cubic flare from (bodyLeft, visDrop) to (0, visTopY) (symmetric with right shoulder)
+		// 12. CurveTo: LEFT SHOULDER — C1 tangent continuous cubic flare from (bodyLeft, visDrop) to (0, visTopY)
+		prebase::live_activity::ConcaveShoulderBezier lShoulder =
+			prebase::live_activity::ComputeLeftShoulderBezier(bodyLeft, visTopY, visDrop);
 		CGPathAddCurveToPoint(path, NULL,
-			bodyLeft - bodyLeft * 0.20, visDrop,
-			0, visTopY + shoulderDrop * 0.45,
-			0, visTopY);
+			lShoulder.cp1.x, lShoulder.cp1.y,
+			lShoulder.cp2.x, lShoulder.cp2.y,
+			lShoulder.p3.x, lShoulder.p3.y);
 
 		// 13. Close: connects (0, visTopY) straight up to (0, 0) through bleed, mirroring Element 5
 		CGPathCloseSubpath(path);
@@ -742,8 +747,20 @@ static NSString *JSString(Napi::Value value) {
 - (void)refreshContentSubviewsPreservingPresentationWithSize:(NSSize)layoutSize;
 @end
 
+@interface PrebaseNotchPanel : NSPanel
+@end
+
+@implementation PrebaseNotchPanel
+- (BOOL)canBecomeKeyWindow {
+	return YES;
+}
+- (BOOL)canBecomeMainWindow {
+	return NO;
+}
+@end
+
 @interface PrebaseLiveActivityController : NSObject
-@property (nonatomic, strong) NSPanel *panel;
+@property (nonatomic, strong) PrebaseNotchPanel *panel;
 @property (nonatomic, strong) PrebaseLiveActivityView *content;
 @property (nonatomic, strong) NSTextField *input;
 @property (nonatomic, strong) NSButton *openButton;
@@ -768,6 +785,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, copy) NSString *pendingKind;
 @property (nonatomic, assign) BOOL pendingDestructive;
 @property (nonatomic, strong) id globalMonitor;
+@property (nonatomic, strong) id globalClickMonitor;
 @property (nonatomic, strong) id localMonitor;
 @property (nonatomic, strong) NSTimer *hoverTimer;
 @property (nonatomic, strong) NSTimer *exitTimer;
@@ -2030,7 +2048,7 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)buildPanel {
 	NSRect frame = NSMakeRect(0, 0, kBootstrapPanelWidth, kBootstrapPanelHeight);
-	self.panel = [[NSPanel alloc] initWithContentRect:frame
+	self.panel = [[PrebaseNotchPanel alloc] initWithContentRect:frame
 		styleMask:(NSWindowStyleMaskNonactivatingPanel | NSWindowStyleMaskBorderless | NSWindowStyleMaskFullSizeContentView)
 		backing:NSBackingStoreBuffered
 		defer:NO];
@@ -2428,9 +2446,10 @@ static NSString *JSString(Napi::Value value) {
 	NSInteger optionCount = [self.pendingKind isEqualToString:@"question"] ? (NSInteger)self.pendingOptions.count : 0;
 	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
 	NSInteger actionCount = MIN((NSInteger)self.content.actions.count, 3);
+	NSInteger transcriptCount = MIN((NSInteger)self.content.conversationTranscript.count, 3);
 	NSString *status = self.content.status ?: @"";
 
-	return [NSString stringWithFormat:@"e=%d;p=%d;pin=%d;att=%d;st=%@;kind=%@;id=%@;opts=%ld;appr=%d;dest=%d;acts=%ld;band=%.1f;notch=%d;h=%.1f;lw=%.1f;rw=%.1f",
+	return [NSString stringWithFormat:@"e=%d;p=%d;pin=%d;att=%d;st=%@;kind=%@;id=%@;opts=%ld;appr=%d;dest=%d;acts=%ld;tc=%ld;band=%.1f;notch=%d;h=%.1f;lw=%.1f;rw=%.1f",
 		expanded ? 1 : 0,
 		peek ? 1 : 0,
 		self.pinned ? 1 : 0,
@@ -2442,6 +2461,7 @@ static NSString *JSString(Napi::Value value) {
 		hasApproval ? 1 : 0,
 		self.pendingDestructive ? 1 : 0,
 		(long)actionCount,
+		(long)transcriptCount,
 		bandH,
 		self.content.notched ? 1 : 0,
 		self.content.housingWidth,
@@ -2512,6 +2532,21 @@ static NSString *JSString(Napi::Value value) {
 		h += MeasureTextHeight(self.content.pendingMessage, pendingMsgFont, contentW, 3) + kContentGap;
 	}
 	if (!hasPending) {
+		if (self.content.conversationTranscript.count > 0) {
+			NSInteger startTurn = (NSInteger)self.content.conversationTranscript.count > 3 ? (NSInteger)self.content.conversationTranscript.count - 3 : 0;
+			for (NSInteger i = startTurn; i < (NSInteger)self.content.conversationTranscript.count; i++) {
+				NSDictionary *turn = self.content.conversationTranscript[i];
+				NSString *role = turn[@"role"] ?: @"agent";
+				NSString *tText = turn[@"text"] ?: @"";
+				if (tText.length == 0) {
+					continue;
+				}
+				BOOL isUser = [role isEqualToString:@"user"];
+				NSFont *tFont = [NSFont systemFontOfSize:11.0 weight:isUser ? NSFontWeightRegular : NSFontWeightMedium];
+				NSString *cleanText = SanitizeTextForContainment(tText);
+				h += MeasureTextHeight(cleanText, tFont, contentW, isUser ? 2 : 3) + kContentGap;
+			}
+		}
 		// Working surface: activity OR latest message (not both) + fixed action-row budget.
 		if (self.content.activityLabel.length) {
 			NSString *primaryText = ResolveHumanReadableActivity(self.content.activityLabel, self.content.latestMessage);
@@ -2996,6 +3031,21 @@ static NSString *JSString(Napi::Value value) {
 			[strong pointerInside:inside];
 		}
 	}];
+
+	if (self.globalClickMonitor == nil) {
+		self.globalClickMonitor = [NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown handler:^(NSEvent *event) {
+			PrebaseLiveActivityController *strong = weakSelf;
+			if (!strong || gDisposed || !strong.visible) {
+				return;
+			}
+			if (!strong.pinned && strong.content.expanded && !strong.content.attention && strong.pendingKind.length == 0) {
+				NSPoint p = [NSEvent mouseLocation];
+				if (strong.panel && !NSPointInRect(p, strong.panel.frame)) {
+					[strong collapseEmittingDismiss:YES];
+				}
+			}
+		}];
+	}
 }
 
 - (void)installLocalKeyMonitor {
@@ -3040,6 +3090,10 @@ static NSString *JSString(Napi::Value value) {
 	if (self.globalMonitor) {
 		[NSEvent removeMonitor:self.globalMonitor];
 		self.globalMonitor = nil;
+	}
+	if (self.globalClickMonitor) {
+		[NSEvent removeMonitor:self.globalClickMonitor];
+		self.globalClickMonitor = nil;
 	}
 }
 

@@ -81,7 +81,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		const status = await this.aiService.getProviderStatus();
 		if (!status.configured) {
 			progress.report(new vscode.LanguageModelTextPart(
-				status.safeStatusMessage || 'Agents has no configured AI provider. Configure a Gemini key in Agents Settings or PreBase root .env.'
+				status.safeStatusMessage || 'PreBase has no configured AI provider. Configure a Gemini key in PreBase Settings or root .env.'
 			));
 			return;
 		}

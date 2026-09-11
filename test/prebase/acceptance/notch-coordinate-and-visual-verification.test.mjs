@@ -70,15 +70,16 @@ test('Magnus Notch: Visible shoulder transition occurs on-screen (visDrop = 28pt
 	// Assert element 5 drops to visTopY, not offscreen shoulderDrop
 	assert.match(liveActivityMm, /CGPathAddLineToPoint\(path,\s*NULL,\s*totalW,\s*visTopY\);/, 'Element 5 must anchor to visible screen edge at (totalW, visTopY)');
 
-	// Assert element 6 curves to (bodyRight, visDrop)
-	assert.match(liveActivityMm, /bodyRight,\s*visDrop\);/, 'Element 6 must curve to (bodyRight, visDrop)');
+	// Assert element 6 curves to (bodyRight, visDrop) via ComputeRightShoulderBezier
+	assert.match(liveActivityMm, /ComputeRightShoulderBezier\(totalW,\s*bodyRight,\s*visTopY,\s*visDrop\)/, 'Element 6 must use ComputeRightShoulderBezier for C1 continuity');
+	assert.match(liveActivityMm, /rShoulder\.p3\.x,\s*rShoulder\.p3\.y\);/, 'Element 6 must terminate at (bodyRight, visDrop)');
 
 	// Assert element 11 lines up to (bodyLeft, visDrop)
 	assert.match(liveActivityMm, /CGPathAddLineToPoint\(path,\s*NULL,\s*bodyLeft,\s*visDrop\);/, 'Element 11 must line to (bodyLeft, visDrop)');
 
-	// Assert element 12 curves symmetrically from (bodyLeft, visDrop) to (0, visTopY)
-	assert.match(liveActivityMm, /bodyLeft\s*-\s*bodyLeft\s*\*\s*0\.20,\s*visDrop,/, 'Element 12 must start curve from bodyLeft at visDrop');
-	assert.match(liveActivityMm, /0,\s*visTopY\s*\+\s*shoulderDrop\s*\*\s*0\.45,\s*\r?\n\s*0,\s*visTopY\);/, 'Element 12 must symmetrically terminate at (0, visTopY)');
+	// Assert element 12 curves symmetrically from (bodyLeft, visDrop) to (0, visTopY) via ComputeLeftShoulderBezier
+	assert.match(liveActivityMm, /ComputeLeftShoulderBezier\(bodyLeft,\s*visTopY,\s*visDrop\)/, 'Element 12 must use ComputeLeftShoulderBezier for C1 continuity');
+	assert.match(liveActivityMm, /lShoulder\.p3\.x,\s*lShoulder\.p3\.y\);/, 'Element 12 must symmetrically terminate at (0, visTopY)');
 	assert.match(liveActivityMm, /CGPathCloseSubpath\(path\);/, 'Element 13 must close subpath straight through bleed to (0, 0)');
 });
 
