@@ -346,7 +346,9 @@ export const MANAGE_CHAT_COMMAND_ID = 'workbench.action.chat.manage';
 
 export const OPEN_WORKSPACE_IN_AGENTS_WINDOW_COMMAND_ID = 'workbench.action.openWorkspaceInAgentsWindow';
 export const OPEN_AGENTS_WINDOW_COMMAND_ID = 'workbench.action.openAgentsWindow';
+export const CONTEXT_AGENTS_WINDOW_ENABLED = new RawContextKey<boolean>('isAgentsWindowEnabled', false);
 export const OPEN_AGENTS_WINDOW_PRECONDITION = ContextKeyExpr.and(
+	CONTEXT_AGENTS_WINDOW_ENABLED,
 	ChatEntitlementContextKeys.Setup.hidden.negate(),
 	ChatEntitlementContextKeys.Setup.disabledInWorkspace.negate(),
 	IsSessionsWindowContext.negate(),

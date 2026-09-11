@@ -1608,22 +1608,69 @@ suite('Magnus Live Activity expanded silhouette geometry (full-width top)', () =
 		assert.strictEqual(confirmCount, 0);
 	});
 
-	test('follow-up sends trimmed text on snapshot sessionResource only', async () => {
+	test('follow-up sends trimmed text on verified snapshot sessionResource only', async () => {
 		const sessionResource = URI.parse('vscode-chat://local/sess-1');
 		let sent: { resource: URI; text: string } | undefined;
+		let applied = false;
 		const snapshot = connectedSnapshot();
+		const model = { sessionId: 'sess-1' } as IChatModel;
 		await applyMagnusLiveActivitySessionCommand(snapshot, {
 			kind: 'followUp',
 			text: '  continue refactor  ',
 		}, {
 			chatService: {
-				getSession: () => undefined,
+				getSession: resource => resource.toString() === sessionResource.toString() ? model : undefined,
 				sendRequest: async (resource, text) => { sent = { resource, text }; return {} as any; },
 				notifyQuestionCarouselAnswer: () => { },
 			},
 			logService: { info: () => { } },
+			onInteractionApplied: () => { applied = true; },
 		});
 		assert.deepStrictEqual(sent, { resource: sessionResource, text: 'continue refactor' });
+		assert.strictEqual(applied, true);
+	});
+
+	test('follow-up fails closed when session is mismatched or missing', async () => {
+		let sent = false;
+		let applied = false;
+		const logs: string[] = [];
+		const snapshot = connectedSnapshot();
+		const wrongModel = { sessionId: 'sess-other' } as IChatModel;
+		await applyMagnusLiveActivitySessionCommand(snapshot, {
+			kind: 'followUp',
+			text: 'hello',
+		}, {
+			chatService: {
+				getSession: () => wrongModel,
+				sendRequest: async () => { sent = true; return {} as any; },
+				notifyQuestionCarouselAnswer: () => { },
+			},
+			logService: { info: msg => logs.push(msg) },
+			onInteractionApplied: () => { applied = true; },
+		});
+		assert.strictEqual(sent, false);
+		assert.strictEqual(applied, false);
+		assert.ok(logs.some(l => l.includes('session mismatch')));
+	});
+
+	test('follow-up ignores empty or whitespace-only messages', async () => {
+		let sent = false;
+		const logs: string[] = [];
+		const snapshot = connectedSnapshot();
+		const model = { sessionId: 'sess-1' } as IChatModel;
+		await applyMagnusLiveActivitySessionCommand(snapshot, {
+			kind: 'followUp',
+			text: '   ',
+		}, {
+			chatService: {
+				getSession: () => model,
+				sendRequest: async () => { sent = true; return {} as any; },
+				notifyQuestionCarouselAnswer: () => { },
+			},
+			logService: { info: msg => logs.push(msg) },
+		});
+		assert.strictEqual(sent, false);
+		assert.ok(logs.some(l => l.includes('empty text')));
 	});
 
 	test('approve and answer fail closed when snapshot sessionId mismatches live model', async () => {

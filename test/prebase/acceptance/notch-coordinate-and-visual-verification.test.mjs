@@ -76,8 +76,10 @@ test('Magnus Notch: Visible shoulder transition occurs on-screen (visDrop = 28pt
 	// Assert element 11 lines up to (bodyLeft, visDrop)
 	assert.match(liveActivityMm, /CGPathAddLineToPoint\(path,\s*NULL,\s*bodyLeft,\s*visDrop\);/, 'Element 11 must line to (bodyLeft, visDrop)');
 
-	// Assert element 12 curves from (bodyLeft, visDrop) to (0, 0)
+	// Assert element 12 curves symmetrically from (bodyLeft, visDrop) to (0, visTopY)
 	assert.match(liveActivityMm, /bodyLeft\s*-\s*bodyLeft\s*\*\s*0\.20,\s*visDrop,/, 'Element 12 must start curve from bodyLeft at visDrop');
+	assert.match(liveActivityMm, /0,\s*visTopY\s*\+\s*shoulderDrop\s*\*\s*0\.45,\s*\r?\n\s*0,\s*visTopY\);/, 'Element 12 must symmetrically terminate at (0, visTopY)');
+	assert.match(liveActivityMm, /CGPathCloseSubpath\(path\);/, 'Element 13 must close subpath straight through bleed to (0, 0)');
 });
 
 test('Magnus Notch: Containers re-anchored so glyphs never clip behind bezel', { skip: !hasNative }, () => {

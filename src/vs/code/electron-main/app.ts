@@ -1442,7 +1442,7 @@ export class CodeApplication extends Disposable {
 		const args = this.environmentMainService.args;
 
 		// Handle agents window first based on context
-		if (args['agents']) {
+		if (args['agents'] && (this.productService.prebaseAgentsWindowEnabled !== false || process.env['PREBASE_ENABLE_AGENTS_WINDOW'])) {
 			return windowsMainService.openAgentsWindow({
 				context,
 				cli: args,

@@ -79,7 +79,7 @@ suite('ChatCompatibilityNotifier', () => {
 		const extensionsService = disposables.add(new MockExtensionsWorkbenchService());
 
 		const productService: Partial<IProductService> = {
-			nameLong: 'PreBase Dev',
+			nameLong: 'PreBase',
 			defaultChatAgent: {
 				extensionId: 'prebase.magnus',
 				chatExtensionId: 'prebase.magnus',
@@ -105,7 +105,7 @@ suite('ChatCompatibilityNotifier', () => {
 		const extensionsService = disposables.add(new MockExtensionsWorkbenchService());
 
 		const productService: Partial<IProductService> = {
-			nameLong: 'PreBase Dev',
+			nameLong: 'PreBase',
 			defaultChatAgent: {
 				extensionId: 'prebase.magnus',
 				chatExtensionId: 'prebase.magnus',
@@ -157,7 +157,7 @@ suite('ChatCompatibilityNotifier', () => {
 		const extensionsService = disposables.add(new MockExtensionsWorkbenchService());
 
 		const productService: Partial<IProductService> = {
-			nameLong: 'PreBase Dev',
+			nameLong: 'PreBase',
 			defaultChatAgent: {
 				extensionId: 'prebase.magnus',
 				chatExtensionId: 'prebase.magnus',
@@ -187,7 +187,7 @@ suite('ChatCompatibilityNotifier', () => {
 		const extensionsService = disposables.add(new MockExtensionsWorkbenchService());
 
 		const productService: Partial<IProductService> = {
-			nameLong: 'PreBase Dev',
+			nameLong: 'PreBase',
 			defaultChatAgent: {
 				extensionId: 'prebase.magnus',
 				chatExtensionId: 'prebase.magnus',

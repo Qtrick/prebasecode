@@ -106,6 +106,11 @@ export async function applyMagnusLiveActivitySessionCommand(
 		return;
 	}
 	const sessionResource = URI.parse(snapshot.sessionResource);
+	const model = deps.chatService.getSession(sessionResource);
+	if (snapshot.sessionId && (!model || model.sessionId !== snapshot.sessionId)) {
+		deps.logService.info('[MagnusLiveActivity] command failed closed: session mismatch');
+		return;
+	}
 	if (command.kind === 'followUp') {
 		const text = (command.text ?? '').trim();
 		if (!text) {
@@ -113,11 +118,7 @@ export async function applyMagnusLiveActivitySessionCommand(
 			return;
 		}
 		await deps.chatService.sendRequest(sessionResource, text);
-		return;
-	}
-	const model = deps.chatService.getSession(sessionResource);
-	if (snapshot.sessionId && (!model || model.sessionId !== snapshot.sessionId)) {
-		deps.logService.info('[MagnusLiveActivity] command failed closed: session mismatch');
+		deps.onInteractionApplied?.();
 		return;
 	}
 	const last = model?.lastRequest;

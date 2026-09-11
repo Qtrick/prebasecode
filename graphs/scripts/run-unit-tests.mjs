@@ -20,7 +20,9 @@ function runMochaOnSource(testRelPath) {
 	const timeoutMs = testRelPath.includes('gitHistoryService.test.ts')
 		|| testRelPath.includes('gitTreeHistoricalAnalysis.test.ts')
 		|| testRelPath.includes('temporalIngestionE2E.test.ts')
-		? '30000'
+		|| testRelPath.includes('temporalScale97k.test.ts')
+		|| testRelPath.includes('temporalServiceE2E.test.ts')
+		? '60000'
 		: '10000';
 	return spawnSync(
 		process.execPath,

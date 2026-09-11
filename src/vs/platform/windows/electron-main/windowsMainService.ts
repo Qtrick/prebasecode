@@ -293,6 +293,10 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 	}
 
 	async openAgentsWindow(openConfig: IOpenConfiguration, folderUri?: URI, sessionResource?: URI): Promise<ICodeWindow[]> {
+		if (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
+			this.logService.info('windowsManager#openAgentsWindow suppressed: Agents window is dormant');
+			return [];
+		}
 		this.logService.trace('windowsManager#openAgentsWindow');
 
 		// Open in a new browser window with the agent sessions workspace

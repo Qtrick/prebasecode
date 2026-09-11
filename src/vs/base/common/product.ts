@@ -255,6 +255,7 @@ export interface IProductConfiguration {
 	readonly emergencyAlertUrl?: string;
 	readonly voiceWsUrl?: string;
 	readonly prebaseBuiltInCopilotEnabled?: boolean;
+	readonly prebaseAgentsWindowEnabled?: boolean;
 
 	readonly remoteDefaultExtensionsIfInstalledLocally?: string[];
 

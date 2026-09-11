@@ -577,13 +577,13 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// 11. LineTo: up left wall to left shoulder bottom
 		CGPathAddLineToPoint(path, NULL, bodyLeft, visDrop);
 
-		// 12. CurveTo: LEFT SHOULDER — smooth cubic flare from (bodyLeft, visDrop) up to (0, 0)
+		// 12. CurveTo: LEFT SHOULDER — smooth cubic flare from (bodyLeft, visDrop) to (0, visTopY) (symmetric with right shoulder)
 		CGPathAddCurveToPoint(path, NULL,
 			bodyLeft - bodyLeft * 0.20, visDrop,
 			0, visTopY + shoulderDrop * 0.45,
-			0, 0);
+			0, visTopY);
 
-		// 13. Close
+		// 13. Close: connects (0, visTopY) straight up to (0, 0) through bleed, mirroring Element 5
 		CGPathCloseSubpath(path);
 	} else {
 		// COMPACT/PILL GEOMETRY: Full-width top edge (wings + housing solid at y=0).
@@ -1179,8 +1179,8 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)mouseDown:(NSEvent *)event {
-	// Peek / Attention Peek → sticky Interactive must match simulateAction("click").
-	if (self.peekOnly || self.controller.attentionPeek) {
+	// Peek / Attention Peek or compact click → sticky Interactive must match simulateAction("click").
+	if (self.peekOnly || self.controller.attentionPeek || !self.expanded) {
 		[self.controller enterInteractiveSticky];
 		return;
 	}
@@ -2912,9 +2912,6 @@ static NSString *JSString(Napi::Value value) {
 		if ([self.environmentState isEqualToString:@"fullscreenSuppressed"] || [self.environmentState isEqualToString:@"screenLocked"]) {
 			return;
 		}
-		if ([self.environmentState isEqualToString:@"backgrounded"] && !self.content.attention) {
-			return;
-		}
 		// Sticky Escape: attention stays compact until click; hover must not reopen peek.
 		if (self.content.attention && self.userDismissedAttention) {
 			return;
@@ -2932,9 +2929,6 @@ static NSString *JSString(Napi::Value value) {
 					return;
 				}
 				if ([strong.environmentState isEqualToString:@"fullscreenSuppressed"] || [strong.environmentState isEqualToString:@"screenLocked"]) {
-					return;
-				}
-				if ([strong.environmentState isEqualToString:@"backgrounded"] && !strong.content.attention) {
 					return;
 				}
 				if (strong.hoverSessionToken != sessionToken) {
@@ -2981,9 +2975,6 @@ static NSString *JSString(Napi::Value value) {
 	}
 	// Environment policy: suppress peek when fullscreen suppressed or backgrounded without attention
 	if ([self.environmentState isEqualToString:@"fullscreenSuppressed"] || [self.environmentState isEqualToString:@"screenLocked"]) {
-		return;
-	}
-	if ([self.environmentState isEqualToString:@"backgrounded"] && !self.content.attention) {
 		return;
 	}
 	self.attentionPeek = NO;

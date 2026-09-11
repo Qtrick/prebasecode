@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-title PreBase Dev
+title PreBase
 
 pushd %~dp0\..
 

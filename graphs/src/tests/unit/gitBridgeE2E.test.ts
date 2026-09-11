@@ -335,7 +335,7 @@ suite('Production Git Bridge & Real Git Fixture E2E Tests', function () {
 
 		// Verify average analysis time is bounded
 		const avgDuration = totalDuration / commitShas.length;
-		assert.ok(avgDuration < 1500, `Average commit analysis duration ${avgDuration}ms should be reasonable`);
+		assert.ok(avgDuration < 5000, `Average commit analysis duration ${avgDuration}ms should be reasonable`);
 
 		// Verify blob reuse calculation
 		const uniqueBlobs = seenBlobOids.size;

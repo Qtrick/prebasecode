@@ -10,6 +10,7 @@ import { ICommandService, CommandsRegistry } from '../../../../../platform/comma
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
 import { IChatEntitlementService } from '../../../../services/chat/common/chatEntitlementService.js';
 
+import product from '../../../../../platform/product/common/product.js';
 import { OPEN_WORKSPACE_IN_AGENTS_WINDOW_COMMAND_ID } from '../../common/constants.js';
 
 
@@ -37,6 +38,9 @@ export interface IAgentsBannerResult {
  * It is also hidden when AI features are disabled.
  */
 export function canShowAgentsBanner(chatEntitlementService: IChatEntitlementService): boolean {
+	if (product.prebaseAgentsWindowEnabled === false) {
+		return false;
+	}
 	const sentiment = chatEntitlementService.sentiment;
 	if (sentiment.hidden || sentiment.disabled) {
 		return false;
