@@ -18,6 +18,7 @@ import { ICodeWindow } from '../../window/electron-main/window.js';
 import { IWindowSettings } from '../../window/common/window.js';
 import { IOpenConfiguration, IWindowsMainService, OpenContext } from '../../windows/electron-main/windows.js';
 import { IProtocolUrl } from '../../url/electron-main/url.js';
+import product, { isAgentsWindowEnabled } from '../../product/common/product.js';
 
 export const ID = 'launchMainService';
 export const ILaunchMainService = createDecorator<ILaunchMainService>(ID);
@@ -145,7 +146,11 @@ export class LaunchMainService implements ILaunchMainService {
 
 		// Agents window
 		else if (args['agents']) {
-			usedWindows = await this.windowsMainService.openAgentsWindow(baseConfig);
+			if (!isAgentsWindowEnabled(product)) {
+				this.logService.info('launchMainService#start suppressed: Agents window is dormant');
+			} else {
+				usedWindows = await this.windowsMainService.openAgentsWindow(baseConfig);
+			}
 		}
 
 		// Start without file/folder arguments

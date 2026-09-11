@@ -72,18 +72,30 @@ static NSDictionary *RectDict(NSRect r) {
 @end
 
 @implementation PrebaseCenteredTextFieldCell
+- (NSRect)adjustedFrameToVerticallyCenterText:(NSRect)frame {
+	NSFont *font = self.font ?: [NSFont systemFontOfSize:12.0];
+	CGFloat textHeight = ceil(font.ascender - font.descender);
+	NSAttributedString *placeholder = [self placeholderAttributedString];
+	if (placeholder && placeholder.length > 0) {
+		textHeight = MAX(textHeight, ceil(placeholder.size.height));
+	}
+	CGFloat yOffset = floor((NSHeight(frame) - textHeight) / 2.0);
+	return NSMakeRect(NSMinX(frame), NSMinY(frame) + yOffset, NSWidth(frame), textHeight);
+}
+
 - (NSRect)drawingRectForBounds:(NSRect)proposedRect {
 	NSRect baseRect = [super drawingRectForBounds:proposedRect];
-	NSAttributedString *attr = [self attributedStringValue];
-	NSSize textSize = (attr && attr.length > 0) ? [attr size] : [[self placeholderAttributedString] size];
-	if (textSize.height <= 0 && self.font) {
-		textSize.height = ceil(self.font.capHeight + 4);
-	}
-	if (textSize.height <= 0) {
-		return baseRect;
-	}
-	CGFloat verticalOffset = floor((NSHeight(baseRect) - textSize.height) / 2.0);
-	return NSMakeRect(NSMinX(baseRect), NSMinY(baseRect) + verticalOffset, NSWidth(baseRect), textSize.height);
+	return [self adjustedFrameToVerticallyCenterText:baseRect];
+}
+
+- (void)editWithFrame:(NSRect)rect inView:(NSView *)controlView editor:(NSText *)textObj delegate:(id)anObject event:(NSEvent *)theEvent {
+	NSRect textFrame = [self adjustedFrameToVerticallyCenterText:rect];
+	[super editWithFrame:textFrame inView:controlView editor:textObj delegate:anObject event:theEvent];
+}
+
+- (void)selectWithFrame:(NSRect)rect inView:(NSView *)controlView editor:(NSText *)textObj delegate:(id)anObject start:(NSInteger)selStart length:(NSInteger)selLength {
+	NSRect textFrame = [self adjustedFrameToVerticallyCenterText:rect];
+	[super selectWithFrame:textFrame inView:controlView editor:textObj delegate:anObject start:selStart length:selLength];
 }
 @end
 
@@ -545,7 +557,7 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// This keeps the expanded body nearly full-width, anchored to the physical housing.
 		CGFloat bodyLeft = shoulderCurve;
 		CGFloat bodyRight = totalW - shoulderCurve;
-		CGFloat topBleed = kTopBleed;
+		CGFloat topBleed = 0.0;
 		CGFloat visTopY = topBleed;
 		CGFloat visDrop = visTopY + shoulderDrop;
 
@@ -567,7 +579,7 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// 4. LineTo: full panel top-right (totalW, 0) — matches compact
 		CGPathAddLineToPoint(path, NULL, totalW, 0);
 
-		// 5. LineTo: right wall top — drop through top bleed to visible bezel anchor
+		// 5. LineTo: right wall top — anchor at (totalW, visTopY) flush with bezel
 		CGPathAddLineToPoint(path, NULL, totalW, visTopY);
 
 		// 6. CurveTo: RIGHT SHOULDER — C1 tangent continuous cubic flare from (totalW, visTopY) to (bodyRight, visDrop)
@@ -607,7 +619,7 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 			lShoulder.cp2.x, lShoulder.cp2.y,
 			lShoulder.p3.x, lShoulder.p3.y);
 
-		// 13. Close: connects (0, visTopY) straight up to (0, 0) through bleed, mirroring Element 5
+		// 13. Close: connects (0, visTopY) straight to (0, 0)
 		CGPathCloseSubpath(path);
 	} else {
 		// COMPACT/PILL GEOMETRY: Full-width top edge (wings + housing solid at y=0).
@@ -952,6 +964,10 @@ static NSString *JSString(Napi::Value value) {
 		_contentScrollView.autohidesScrollers = YES;
 		_contentScrollView.verticalScrollElasticity = NSScrollElasticityAllowed;
 		_contentScrollView.documentView = _contentDocumentView;
+		_contentScrollView.wantsLayer = YES;
+		_contentScrollView.layer.masksToBounds = YES;
+		_contentScrollView.contentView.wantsLayer = YES;
+		_contentScrollView.contentView.layer.masksToBounds = YES;
 		[_expandedContainer addSubview:_contentScrollView];
 
 		_activityDescription = [self makeLabel:11.5 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.90 alpha:1.0]];
@@ -2423,7 +2439,7 @@ static NSString *JSString(Napi::Value value) {
 	// corner radius. So this returns the height from the first control row to body bottom
 	// (including effBottomR + 5 which is the gap below the last row).
 	if (st == PrebasePresentationStateInteractiveApproval) {
-		return kControlHeight + kBottomCornerRadius + 5;
+		return kControlHeight + 8.0;
 	}
 	BOOL hasOptions = (st == PrebasePresentationStateInteractiveQuestion && self.pendingOptions.count > 0);
 	if (hasOptions) {
@@ -2434,9 +2450,9 @@ static NSString *JSString(Napi::Value value) {
 		if (totalOpts > 4) {
 			rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
 		}
-		return rows * kControlHeight + MAX(0, rows - 1) * 4 + kBottomCornerRadius + 5;
+		return rows * kControlHeight + MAX(0, rows - 1) * 4 + 8.0;
 	}
-	return kControlHeight + kBottomCornerRadius + 5;
+	return kControlHeight + 8.0;
 }
 
 /** Geometry signature — incorporates semantic state (status, kind, interactionId, options, actions); raw character counts are excluded so streaming text never morphs geometry. */
@@ -2819,9 +2835,8 @@ static NSString *JSString(Napi::Value value) {
 	SilhouetteShoulderMetrics fShoulder = ComputeSilhouetteShoulderMetrics(NSWidth(win), bodyHeight, fLeftW, fRightW, fHousing, YES);
 	// For expanded state, body walls start at shoulderCurve from panel edges.
 	CGFloat footerInset = ContentSafeInsetX(self.content.notched, fShoulder.effShoulderR, YES);
-	// Bottom corner radius clips vertical space — buttons must clear it by 5pt.
-	CGFloat effBottomR = MIN(kBottomCornerRadius, bodyHeight * 0.40);
-	CGFloat bottomY = bodyHeight - kControlHeight - effBottomR - 5;
+	CGFloat bottomMargin = 8.0;
+	CGFloat bottomY = bodyHeight - kControlHeight - bottomMargin;
 	CGFloat usableW = NSWidth(win) - footerInset * 2;
 
 	BOOL controlsEnabled = !self.actionInFlight;

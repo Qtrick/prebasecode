@@ -103,8 +103,8 @@ test('Magnus Notch Overhaul: Outside-click dismissal installed for unpinned expa
 // 2. Fail-Closed Dormancy Behavioral Tests
 test('Agents Window Dormancy: CLI --agents and app startup fail-closed when prebaseAgentsWindowEnabled is disabled', () => {
 	const appTs = readFileSync(join(repoRoot, 'src/vs/code/electron-main/app.ts'), 'utf8');
-	assert.match(appTs, /if\s*\(args\['agents'\]\s*&&\s*\(this\.productService\.prebaseAgentsWindowEnabled\s*!==\s*false\s*\|\|\s*process\.env\['PREBASE_ENABLE_AGENTS_WINDOW'\]\)\)/,
-		'app.ts must gate CLI --agents check on prebaseAgentsWindowEnabled and env override');
+	assert.match(appTs, /if\s*\(args\['agents'\]\s*&&\s*isAgentsWindowEnabled\(this\.productService\)\)/,
+		'app.ts must gate CLI --agents check on isAgentsWindowEnabled');
 
 	const productJson = JSON.parse(readFileSync(join(repoRoot, 'product.json'), 'utf8'));
 	assert.strictEqual(productJson.prebaseAgentsWindowEnabled, false,
@@ -113,8 +113,6 @@ test('Agents Window Dormancy: CLI --agents and app startup fail-closed when preb
 
 test('Agents Window Dormancy: Welcome page agents banner fail-closed via isAgentsWindowEnabled', () => {
 	const bannerTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/chat/browser/agentSessions/agentSessionsBanner.ts'), 'utf8');
-	assert.match(bannerTs, /if\s*\(product\.prebaseAgentsWindowEnabled\s*===\s*false\)\s*\{\s*return false;\s*\}/,
-		'canShowAgentsBanner must return false when product.prebaseAgentsWindowEnabled is false');
 	assert.match(bannerTs, /if\s*\(!isAgentsWindowEnabled\(product\)\)\s*\{\s*return false;\s*\}/,
 		'canShowAgentsBanner must return false when !isAgentsWindowEnabled(product)');
 });

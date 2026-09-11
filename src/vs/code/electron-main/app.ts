@@ -17,6 +17,7 @@ import { Disposable, DisposableStore, MutableDisposable, toDisposable } from '..
 import { Schemas, VSCODE_AUTHORITY } from '../../base/common/network.js';
 import { join, posix } from '../../base/common/path.js';
 import { IProcessEnvironment, isLinux, isLinuxSnap, isMacintosh, isWindows, OS } from '../../base/common/platform.js';
+import { isAgentsWindowEnabled } from '../../base/common/product.js';
 import { assertType } from '../../base/common/types.js';
 import { URI } from '../../base/common/uri.js';
 import { generateUuid } from '../../base/common/uuid.js';
@@ -1442,7 +1443,7 @@ export class CodeApplication extends Disposable {
 		const args = this.environmentMainService.args;
 
 		// Handle agents window first based on context
-		if (args['agents'] && (this.productService.prebaseAgentsWindowEnabled !== false || process.env['PREBASE_ENABLE_AGENTS_WINDOW'])) {
+		if (args['agents'] && isAgentsWindowEnabled(this.productService)) {
 			return windowsMainService.openAgentsWindow({
 				context,
 				cli: args,

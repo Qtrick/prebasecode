@@ -18,6 +18,7 @@ import { TerminalContribCommandId } from '../../../terminal/terminalContribExpor
 import { ChatContextKeyExprs, ChatContextKeys } from '../../common/actions/chatContextKeys.js';
 import { ChatAgentLocation, ChatConfiguration, ChatModeKind } from '../../common/constants.js';
 import { FocusAgentSessionsAction } from '../agentSessions/agentSessionsActions.js';
+import { isAgentsWindowEnabled } from '../../common/agentsWindowCapability.js';
 import { IChatWidgetService } from '../chat.js';
 import { ChatEditingShowChangesAction, ViewPreviousEditsAction } from '../chatEditing/chatEditingActions.js';
 
@@ -164,8 +165,8 @@ export function getChatAccessibilityHelpProvider(accessor: ServicesAccessor, edi
 	const cachedPosition = inputEditor.getPosition();
 	inputEditor.getSupportedActions();
 	const productService = accessor.get(IProductService);
-	const isAgentsWindowEnabled = Boolean(productService.prebaseAgentsWindowEnabled) || Boolean(process.env['PREBASE_ENABLE_AGENTS_WINDOW']);
-	const helpText = getAccessibilityHelpText(type, keybindingService, isAgentsWindowEnabled);
+	const agentsWindowEnabled = isAgentsWindowEnabled(productService);
+	const helpText = getAccessibilityHelpText(type, keybindingService, agentsWindowEnabled);
 	return new AccessibleContentProvider(
 		type === 'panelChat' ? AccessibleViewProviderId.PanelChat : type === 'inlineChat' ? AccessibleViewProviderId.InlineChat : type === 'agentView' ? AccessibleViewProviderId.AgentChat : AccessibleViewProviderId.QuickChat,
 		{ type: AccessibleViewType.Help },

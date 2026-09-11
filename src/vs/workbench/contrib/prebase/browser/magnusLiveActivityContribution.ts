@@ -529,7 +529,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		if (Date.now() < this._visualFixtureHoldUntil) {
 			return;
 		}
-		const allModels = this.chatService.chatModels.get();
+		const allModels = Array.from(this.chatService.chatModels.get());
 		let model: IChatModel | undefined;
 		if (this._selectedSessionId) {
 			model = allModels.find(m => m.sessionId === this._selectedSessionId);
@@ -707,7 +707,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		if (command.kind === 'selectSession') {
 			const targetSessionId = command.targetSessionId || command.sessionId;
 			const targetResourceStr = command.targetSessionResource || command.sessionResource;
-			const allModels = this.chatService.chatModels.get();
+			const allModels = Array.from(this.chatService.chatModels.get());
 			let targetModel: IChatModel | undefined;
 			if (targetSessionId) {
 				targetModel = allModels.find(m => m.sessionId === targetSessionId && (isMagnusModel(m) || m.sessionId === this._selectedSessionId));

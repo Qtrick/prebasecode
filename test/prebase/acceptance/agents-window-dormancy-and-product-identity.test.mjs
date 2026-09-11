@@ -47,7 +47,7 @@ test('Agents Window Dormancy: product.json and IProductConfiguration gate is dis
 
 test('Agents Window Dormancy: Welcome page agents banner is suppressed', () => {
 	const bannerTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/chat/browser/agentSessions/agentSessionsBanner.ts'), 'utf8');
-	assert.match(bannerTs, /if\s*\(product\.prebaseAgentsWindowEnabled\s*===\s*false\)\s*\{\s*return false;\s*\}/, 'canShowAgentsBanner must return false when prebaseAgentsWindowEnabled is false');
+	assert.match(bannerTs, /if\s*\(!isAgentsWindowEnabled\(product\)\)\s*\{\s*return false;\s*\}/, 'canShowAgentsBanner must return false when isAgentsWindowEnabled(product) is false');
 });
 
 test('Agents Window Dormancy: Precondition context key and commands are gated', () => {
@@ -66,16 +66,16 @@ test('Agents Window Dormancy: Precondition context key and commands are gated', 
 	// Title bar contribution must not register widget when dormant
 	assert.match(actionsTs, /if\s*\(!enabled\)\s*\{\s*return;\s*\}/, 'OpenWorkspaceInAgentsContribution must return early when dormant');
 
-	// Actions must fail closed in run() if dormant
-	assert.match(actionsTs, /if\s*\(product\.prebaseAgentsWindowEnabled\s*===\s*false\s*&&\s*!process\.env\['PREBASE_ENABLE_AGENTS_WINDOW'\]\)\s*\{\s*return;\s*\}/, 'Action run() methods must guard against dormant execution');
+	// Actions must fail closed in run() if dormant via isAgentsWindowEnabled
+	assert.match(actionsTs, /if\s*\(!isAgentsWindowEnabled\(product\)\)\s*\{\s*return;\s*\}/, 'Action run() methods must guard against dormant execution via isAgentsWindowEnabled');
 });
 
 test('Agents Window Dormancy: Main process suppresses windowsMainService.openAgentsWindow and CLI --agents', () => {
 	const windowsMainTs = readFileSync(join(repoRoot, 'src/vs/platform/windows/electron-main/windowsMainService.ts'), 'utf8');
-	assert.match(windowsMainTs, /if\s*\(product\.prebaseAgentsWindowEnabled\s*===\s*false\s*&&\s*!process\.env\['PREBASE_ENABLE_AGENTS_WINDOW'\]\)\s*\{[\s\S]*openAgentsWindow suppressed: Agents window is dormant/, 'openAgentsWindow must be suppressed when dormant');
+	assert.match(windowsMainTs, /if\s*\(!isAgentsWindowEnabled\(product\)\)\s*\{[\s\S]*openAgentsWindow suppressed: Agents window is dormant/, 'openAgentsWindow must be suppressed when dormant via isAgentsWindowEnabled');
 
 	const appTs = readFileSync(join(repoRoot, 'src/vs/code/electron-main/app.ts'), 'utf8');
-	assert.match(appTs, /if\s*\(args\['agents'\]\s*&&\s*\(this\.productService\.prebaseAgentsWindowEnabled\s*!==\s*false\s*\|\|\s*process\.env\['PREBASE_ENABLE_AGENTS_WINDOW'\]\)\)/, 'CLI --agents must not launch dormant agents window');
+	assert.match(appTs, /if\s*\(args\['agents'\]\s*&&\s*isAgentsWindowEnabled\(this\.productService\)\)/, 'CLI --agents must fail-closed via isAgentsWindowEnabled');
 });
 
 test('Quick messaging & session integrity: followUp validates session identity before dispatch', () => {
@@ -105,18 +105,21 @@ test('Notch minimized/background interaction: hover and click expansion enabled 
 
 test('Agents Window Dormancy: chatAccessibilityHelp suppresses agent window actions when dormant', () => {
 	const helpTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/chat/browser/actions/chatAccessibilityHelp.ts'), 'utf8');
-	assert.match(helpTs, /const isAgentsWindowEnabled = Boolean\(productService\.prebaseAgentsWindowEnabled\) \|\| Boolean\(process\.env\['PREBASE_ENABLE_AGENTS_WINDOW'\]\);/, 'chatAccessibilityHelp must check productService and env override');
-	assert.match(helpTs, /if \(isAgentsWindowEnabled\)\s*\{[\s\S]*focusAgentSessionsViewer[\s\S]*openAgentsWindow[\s\S]*openAgentHostFolderPicker/, 'agent window announcements must be enclosed in isAgentsWindowEnabled check');
+	assert.match(helpTs, /isAgentsWindowEnabled\(productService\)/, 'chatAccessibilityHelp must check isAgentsWindowEnabled(productService)');
+	assert.match(helpTs, /if\s*\(isAgentsWindowEnabled\)\s*\{[\s\S]*focusAgentSessionsViewer[\s\S]*openAgentsWindow[\s\S]*openAgentHostFolderPicker/, 'agent window announcements must be enclosed in isAgentsWindowEnabled check');
 });
 
 test('Agents Window Dormancy: Centralized isAgentsWindowEnabled capability behavior', () => {
 	const capabilityTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/chat/common/agentsWindowCapability.ts'), 'utf8');
-	assert.match(capabilityTs, /export function isAgentsWindowEnabled\(/, 'isAgentsWindowEnabled function must be exported');
+	assert.match(capabilityTs, /export\s+(?:function|\{)\s*isAgentsWindowEnabled/, 'isAgentsWindowEnabled must be exported from agentsWindowCapability.ts');
+
+	const productTs = readFileSync(join(repoRoot, 'src/vs/base/common/product.ts'), 'utf8');
+	assert.match(productTs, /export\s+(?:function|\{)\s*isAgentsWindowEnabled/, 'isAgentsWindowEnabled must be exported from base/common/product.ts');
 
 	// Run behavior test via strip-types child
 	const script = `
 import assert from 'node:assert/strict';
-import { isAgentsWindowEnabled } from ${JSON.stringify(join(repoRoot, 'src/vs/workbench/contrib/chat/common/agentsWindowCapability.ts'))};
+import { isAgentsWindowEnabled } from ${JSON.stringify(join(repoRoot, 'src/vs/base/common/agentsWindow.ts'))};
 
 // Default product config (dormant)
 assert.strictEqual(isAgentsWindowEnabled({ prebaseAgentsWindowEnabled: false }, {}), false, 'Default dormant config must return false');
@@ -145,8 +148,8 @@ test('Agents Window Dormancy: Tips and handoff messaging completely suppressed',
 
 test('Agents Window Dormancy: NativeHostMainService suppresses openAgentsWindow', () => {
 	const nativeHostTs = readFileSync(join(repoRoot, 'src/vs/platform/native/electron-main/nativeHostMainService.ts'), 'utf8');
-	assert.match(nativeHostTs, /openAgentsWindow\(windowId: number \| undefined[\s\S]*if \(this\.productService\.prebaseAgentsWindowEnabled === false && !process\.env\['PREBASE_ENABLE_AGENTS_WINDOW'\]\)\s*\{\s*this\.logService\.info\('nativeHost#openAgentsWindow suppressed: Agents window is dormant'\);/,
-		'nativeHostMainService must suppress openAgentsWindow when dormant');
+	assert.match(nativeHostTs, /openAgentsWindow\(windowId: number \| undefined[\s\S]*if \(!isAgentsWindowEnabled\(this\.productService\)\)\s*\{\s*this\.logService\.info\('nativeHost#openAgentsWindow suppressed: Agents window is dormant'\);/,
+		'nativeHostMainService must suppress openAgentsWindow when dormant via isAgentsWindowEnabled');
 });
 
 test('Product identity: Runtime Preview terminal uses canonical PreBase Server name', () => {

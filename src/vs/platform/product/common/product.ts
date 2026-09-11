@@ -100,4 +100,5 @@ else {
 	}
 }
 
+export { isAgentsWindowEnabled } from '../../../base/common/product.js';
 export default product;

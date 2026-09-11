@@ -67,9 +67,6 @@ export class OpenWorkspaceInAgentsWindowAction extends Action2 {
 	}
 
 	async run(accessor: ServicesAccessor) {
-		if (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
-			return;
-		}
 		if (!isAgentsWindowEnabled(product)) {
 			return;
 		}
@@ -115,9 +112,6 @@ export class OpenAgentsWindowAction extends Action2 {
 	}
 
 	async run(accessor: ServicesAccessor, args?: { folderUri?: UriComponents; sessionResource?: UriComponents }) {
-		if (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
-			return;
-		}
 		if (!isAgentsWindowEnabled(product)) {
 			return;
 		}
@@ -158,9 +152,6 @@ export class OpenChatSessionInAgentsWindowAction extends Action2 {
 	}
 
 	async run(accessor: ServicesAccessor, ...rest: unknown[]): Promise<void> {
-		if (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
-			return;
-		}
 		if (!isAgentsWindowEnabled(product)) {
 			return;
 		}
@@ -240,7 +231,7 @@ export class OpenWorkspaceInAgentsContribution extends Disposable implements IWo
 		@IProductService productService: IProductService,
 	) {
 		super();
-		const enabled = isAgentsWindowEnabled(productService) && ((productService.prebaseAgentsWindowEnabled ?? false) || Boolean(process.env['PREBASE_ENABLE_AGENTS_WINDOW']));
+		const enabled = isAgentsWindowEnabled(productService);
 		CONTEXT_AGENTS_WINDOW_ENABLED.bindTo(contextKeyService).set(enabled);
 		if (!enabled) {
 			return;
@@ -394,7 +385,7 @@ export class AgentsHandoffInputTipContribution extends Disposable implements IWo
 
 	private _update(): void {
 		// Fail-closed dormancy: when Agents Window is not enabled, immediately tear down any notification and return.
-		if (!isAgentsWindowEnabled(product) || (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW'])) {
+		if (!isAgentsWindowEnabled(product)) {
 			if (this._lastPostedFor) {
 				this._notificationService.deleteNotification(AgentsHandoffInputTipContribution.NOTIFICATION_ID);
 				this._lastPostedFor = undefined;

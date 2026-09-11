@@ -237,7 +237,7 @@ if (!native.includes('emit:@"dismissAttention"')) {
 			const stackFnStart = native.indexOf('- (CGFloat)computeControlsStackHeight {');
 			const stackFn = stackFnStart >= 0 ? native.slice(stackFnStart, stackFnStart + 1400) : '';
 			if (!/Must match layoutControls/.test(stackFn)
-				|| !/kControlHeight \+ kBottomCornerRadius \+ 5/.test(stackFn)
+				|| (!/kControlHeight \+ 8\.0/.test(stackFn) && !/kControlHeight \+ kBottomCornerRadius \+ 5/.test(stackFn))
 				|| !/perRow = \(maxDirect >= 3\) \? 2/.test(stackFn)) {
 				failures.push('computeControlsStackHeight must match layoutControls (composer + approval + 2-col option rows)');
 			}

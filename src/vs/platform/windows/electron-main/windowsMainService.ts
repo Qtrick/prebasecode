@@ -33,7 +33,7 @@ import { FileType, IFileService } from '../../files/common/files.js';
 import { IInstantiationService } from '../../instantiation/common/instantiation.js';
 import { ILifecycleMainService } from '../../lifecycle/electron-main/lifecycleMainService.js';
 import { ILogService } from '../../log/common/log.js';
-import product from '../../product/common/product.js';
+import product, { isAgentsWindowEnabled } from '../../product/common/product.js';
 import { IProtocolMainService } from '../../protocol/electron-main/protocol.js';
 import { getRemoteAuthority } from '../../remote/common/remoteHosts.js';
 import { IStateService } from '../../state/node/state.js';
@@ -293,7 +293,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 	}
 
 	async openAgentsWindow(openConfig: IOpenConfiguration, folderUri?: URI, sessionResource?: URI): Promise<ICodeWindow[]> {
-		if (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
+		if (!isAgentsWindowEnabled(product)) {
 			this.logService.info('windowsManager#openAgentsWindow suppressed: Agents window is dormant');
 			return [];
 		}

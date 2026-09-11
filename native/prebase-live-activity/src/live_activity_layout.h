@@ -61,8 +61,8 @@ inline SilhouetteMetrics ComputeSilhouetteMetrics(
 	m.flare = effR;
 	m.wingLeftX = effR;
 	m.wingRightX = totalW - effR;
-	m.shoulderDrop = isExpanded ? shoulderDrop : effR;
-	m.visTopY = topBleed;
+	m.shoulderDrop = effR;
+	m.visTopY = isExpanded ? 0.0 : topBleed;
 	m.visDrop = m.visTopY + m.shoulderDrop;
 	m.bodyLeft = effR;
 	m.bodyRight = totalW - effR;

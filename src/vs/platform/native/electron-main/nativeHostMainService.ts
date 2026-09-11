@@ -14,6 +14,7 @@ import { Disposable, DisposableMap, DisposableStore, toDisposable } from '../../
 import { matchesSomeScheme, Schemas } from '../../../base/common/network.js';
 import { dirname, join, posix, resolve, win32 } from '../../../base/common/path.js';
 import { isLinux, isMacintosh, isWindows } from '../../../base/common/platform.js';
+import { isAgentsWindowEnabled } from '../../../base/common/product.js';
 import { AddFirstParameterToFunctions } from '../../../base/common/types.js';
 import { URI, UriComponents } from '../../../base/common/uri.js';
 import { virtualMachineHint } from '../../../base/node/id.js';
@@ -316,7 +317,7 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
 	}
 
 	async openAgentsWindow(windowId: number | undefined, options?: { folderUri?: UriComponents; sessionResource?: UriComponents }): Promise<void> {
-		if (this.productService.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
+		if (!isAgentsWindowEnabled(this.productService)) {
 			this.logService.info('nativeHost#openAgentsWindow suppressed: Agents window is dormant');
 			return;
 		}

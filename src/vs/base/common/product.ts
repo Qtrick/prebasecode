@@ -447,3 +447,6 @@ export interface IDefaultChatAgent {
 	readonly completionsEnablementSetting: string;
 	readonly nextEditSuggestionsSetting: string;
 }
+
+export { isAgentsWindowEnabled } from './agentsWindow.js';
+

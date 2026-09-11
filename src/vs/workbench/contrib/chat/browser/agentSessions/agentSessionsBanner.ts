@@ -39,9 +39,6 @@ export interface IAgentsBannerResult {
  * It is also hidden when AI features are disabled.
  */
 export function canShowAgentsBanner(chatEntitlementService: IChatEntitlementService): boolean {
-	if (product.prebaseAgentsWindowEnabled === false) {
-		return false;
-	}
 	if (!isAgentsWindowEnabled(product)) {
 		return false;
 	}
