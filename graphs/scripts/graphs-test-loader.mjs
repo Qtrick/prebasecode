@@ -26,12 +26,19 @@ export async function resolve(specifier, context, nextResolve) {
 		}
 
 		if (parent.includes('/graphs/src/')) {
-			if (specifier.startsWith('../../../../../../')) {
+			const directResolved = resolvePath(parent, specifier);
+			const directTs = directResolved.replace(/\.js$/, '.ts');
+			if (existsSync(directResolved) || existsSync(directTs)) {
+				resolvedTarget = directResolved;
+			} else if (specifier.startsWith('../../../../../../')) {
 				const sub = specifier.replace(/^(\.\.\/)+/, '');
 				resolvedTarget = resolvePath(process.cwd(), 'src/vs', sub);
 			} else if (specifier.startsWith('../../../../../')) {
 				const sub = specifier.replace(/^(\.\.\/)+/, '');
 				resolvedTarget = resolvePath(process.cwd(), 'src/vs/workbench', sub);
+			} else if (parent.includes('/graphs/src/host/workbench') && specifier.startsWith('../../../../')) {
+				const sub = specifier.replace(/^(\.\.\/)+/, '');
+				resolvedTarget = resolvePath(process.cwd(), 'src/vs/workbench/contrib', sub);
 			} else if (parent.includes('/graphs/src/host/workbench') && specifier.startsWith('../../../')) {
 				const sub = specifier.replace(/^(\.\.\/)+/, '');
 				resolvedTarget = resolvePath(process.cwd(), 'src/vs/workbench/contrib/prebase', sub);
@@ -73,3 +80,37 @@ export async function resolve(specifier, context, nextResolve) {
 	}
 	return nextResolve(specifier, context);
 }
+
+let tsCompilerPromise = null;
+function getTsCompiler() {
+	if (!tsCompilerPromise) {
+		tsCompilerPromise = import('typescript').then(m => m.default);
+	}
+	return tsCompilerPromise;
+}
+
+export async function load(url, context, nextLoad) {
+	if (url.startsWith('file://') && url.endsWith('.ts')) {
+		const filePath = fileURLToPath(url);
+		if (filePath.includes('/graphs/src/host/workbench/')) {
+			const { readFileSync } = await import('node:fs');
+			const source = readFileSync(filePath, 'utf8');
+			const ts = await getTsCompiler();
+			const transpiled = ts.transpileModule(source, {
+				compilerOptions: {
+					target: ts.ScriptTarget.ES2022,
+					module: ts.ModuleKind.ESNext,
+					experimentalDecorators: true,
+				},
+				fileName: filePath,
+			});
+			return {
+				format: 'module',
+				shortCircuit: true,
+				source: transpiled.outputText,
+			};
+		}
+	}
+	return nextLoad(url, context);
+}
+

@@ -76,10 +76,25 @@ export interface MagnusLiveActivityDiffSummary {
 	readonly attributedToMagnus: boolean;
 }
 
+export interface MagnusLiveActivityAvailableSession {
+	readonly sessionId: string;
+	readonly sessionResource: string;
+	readonly title: string;
+	readonly isBusy?: boolean;
+}
+
+export interface MagnusLiveActivityTranscriptTurn {
+	readonly role: 'user' | 'agent';
+	readonly text: string;
+}
+
 export interface MagnusLiveActivitySnapshot {
 	readonly revision: number;
 	readonly sessionId: string | undefined;
 	readonly sessionResource: string | undefined;
+	readonly sessionTitle?: string;
+	readonly availableSessions?: readonly MagnusLiveActivityAvailableSession[];
+	readonly conversationTranscript?: readonly MagnusLiveActivityTranscriptTurn[];
 	readonly startedAt: number | undefined;
 	readonly status: MagnusLiveActivityStatus;
 	readonly taskTitle?: string;
@@ -336,6 +351,9 @@ export interface MagnusLiveActivitySessionInput {
 	readonly sessionResource: string;
 	readonly startedAt: number;
 	readonly title?: string;
+	readonly sessionTitle?: string;
+	readonly availableSessions?: readonly MagnusLiveActivityAvailableSession[];
+	readonly conversationTranscript?: readonly MagnusLiveActivityTranscriptTurn[];
 	readonly isInProgress: boolean;
 	readonly needsInput?: boolean;
 	readonly currentActivity?: string;
@@ -465,6 +483,9 @@ export function buildMagnusLiveActivitySnapshot(
 		revision: options.revision,
 		sessionId: input.sessionId,
 		sessionResource: input.sessionResource,
+		sessionTitle: hide ? undefined : (input.sessionTitle || input.title),
+		availableSessions: hide ? [] : input.availableSessions,
+		conversationTranscript: hide ? [] : input.conversationTranscript,
 		startedAt: input.startedAt,
 		status,
 		taskTitle: hide ? undefined : redactLiveActivityText(input.title),
@@ -599,12 +620,14 @@ export function canonicalizeLiveActivityPanelState(state: MagnusLiveActivityPane
 	}
 }
 
-export type LiveActivityCommandKind = 'followUp' | 'approve' | 'deny' | 'answer' | 'openInPrebase' | 'pin' | 'unpin' | 'dismissAttention';
+export type LiveActivityCommandKind = 'followUp' | 'approve' | 'deny' | 'answer' | 'openInPrebase' | 'pin' | 'unpin' | 'dismissAttention' | 'selectSession' | 'createSession';
 
 export interface LiveActivityCommand {
 	readonly kind: LiveActivityCommandKind;
 	readonly sessionId?: string;
 	readonly sessionResource?: string;
+	readonly targetSessionId?: string;
+	readonly targetSessionResource?: string;
 	readonly revision?: number;
 	readonly interactionId?: string;
 	readonly text?: string;
@@ -625,6 +648,15 @@ export function acceptLiveActivityCommand(
 	// Lock screen: reject all commands — panel is hidden and must not mutate session state.
 	if (snapshot.screenLocked) {
 		return { ok: false, reason: 'screen-locked' };
+	}
+	if (command.kind === 'createSession') {
+		return { ok: true };
+	}
+	if (command.kind === 'selectSession') {
+		if (!command.targetSessionId && !command.targetSessionResource && !command.sessionId && !command.sessionResource) {
+			return { ok: false, reason: 'missing-session' };
+		}
+		return { ok: true };
 	}
 	if (command.revision !== undefined && command.revision !== snapshot.revision) {
 		const pending = snapshot.pendingInteraction;

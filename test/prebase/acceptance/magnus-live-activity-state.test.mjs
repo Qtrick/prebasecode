@@ -849,3 +849,122 @@ test('ContentSafeInsetX comment mentions 4pt safety margin, not effBottomR*0.5',
 		'ContentSafeInsetX comment must not mention effBottomR*0.5');
 });
 
+test('command contract: acceptLiveActivityCommand accepts selectSession and createSession', () => {
+	const script = `
+import assert from 'node:assert/strict';
+import {
+	acceptLiveActivityCommand,
+	buildMagnusLiveActivitySnapshot,
+} from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
+
+const baseSnapshot = buildMagnusLiveActivitySnapshot({
+	sessionId: 'sess-1',
+	sessionResource: 'vscode-chat://local/sess-1',
+	startedAt: 1000,
+	title: 'Fix issue',
+	isInProgress: true,
+	currentActivity: 'Compiling',
+}, { revision: 1, prebaseForeground: false, connected: true });
+
+const selectCmd = acceptLiveActivityCommand(baseSnapshot, {
+	kind: 'selectSession',
+	targetSessionId: 'sess-xyz',
+});
+assert.ok(selectCmd.ok, 'selectSession command must be accepted');
+
+const createCmd = acceptLiveActivityCommand(baseSnapshot, {
+	kind: 'createSession',
+});
+assert.ok(createCmd.ok, 'createSession command must be accepted');
+
+// Invalid commands fail closed
+const invalidSelect = acceptLiveActivityCommand(baseSnapshot, { kind: 'selectSession' });
+assert.equal(invalidSelect.ok, false, 'selectSession without targetSessionId must be rejected');
+
+// Screen locked snapshot rejects all commands
+const lockedSnapshot = buildMagnusLiveActivitySnapshot({
+	sessionId: 'sess-1',
+	sessionResource: 'vscode-chat://local/sess-1',
+	startedAt: 1000,
+	title: 'Fix issue',
+	isInProgress: true,
+	currentActivity: 'Compiling',
+}, { revision: 1, prebaseForeground: false, connected: true, screenLocked: true });
+
+const lockedSelect = acceptLiveActivityCommand(lockedSnapshot, { kind: 'selectSession', targetSessionId: 'sess-xyz' });
+assert.equal(lockedSelect.ok, false, 'screen locked snapshot must reject selectSession');
+`;
+	const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+		cwd: repoRoot,
+		encoding: 'utf8',
+	});
+	assert.equal(child.status, 0, child.stderr || child.stdout);
+});
+
+test('snapshot contract: sessionTitle, availableSessions, and conversationTranscript are preserved in snapshot', () => {
+	const script = `
+import assert from 'node:assert/strict';
+import {
+	buildMagnusLiveActivitySnapshot,
+} from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
+
+const snapshot = buildMagnusLiveActivitySnapshot({
+	sessionId: 'sess-1',
+	sessionResource: 'vscode-chat://local/sess-1',
+	startedAt: 1000,
+	title: 'Fix issue',
+	isInProgress: true,
+	currentActivity: 'Compiling',
+	sessionTitle: 'Fix issue',
+	availableSessions: [
+		{ sessionId: 'sess-1', title: 'Fix issue', isCurrent: true, startedAt: 1000 },
+		{ sessionId: 'sess-2', title: 'Add tests', isCurrent: false, startedAt: 2000 },
+	],
+	conversationTranscript: [
+		{ role: 'user', content: 'Run test suite' },
+		{ role: 'agent', content: 'Tests running, 15 passed' },
+	],
+}, { revision: 1, prebaseForeground: false, connected: true });
+
+assert.equal(snapshot.sessionTitle, 'Fix issue');
+assert.equal(snapshot.availableSessions.length, 2);
+assert.equal(snapshot.availableSessions[0].sessionId, 'sess-1');
+assert.equal(snapshot.availableSessions[0].isCurrent, true);
+assert.equal(snapshot.conversationTranscript.length, 2);
+assert.equal(snapshot.conversationTranscript[0].role, 'user');
+assert.equal(snapshot.conversationTranscript[1].content, 'Tests running, 15 passed');
+`;
+	const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+		cwd: repoRoot,
+		encoding: 'utf8',
+	});
+	assert.equal(child.status, 0, child.stderr || child.stdout);
+});
+
+test('native UI layout: approval buttons balanced 50/50 with equal widths', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// Approve and Deny buttons must divide width equally (50/50)
+	assert.match(native, /CGFloat denyW = floor\(\(usableW - apprGap\) \/ 2\.0\);/,
+		'Deny button width must be computed as 50% split');
+	assert.match(native, /CGFloat approveW = usableW - apprGap - denyW;/,
+		'Approve button width must match remainder for exact pixel-perfect 50/50 split');
+	assert.match(native, /self\.denyButton\.frame = NSMakeRect\(footerInset, bottomY, denyW, kControlHeight\);/,
+		'Deny button must use denyW');
+	assert.match(native, /self\.approveButton\.frame = NSMakeRect\(footerInset \+ denyW \+ apprGap, bottomY, approveW, kControlHeight\);/,
+		'Approve button must use approveW');
+});
+
+test('native backgrounded interaction: simulateAction allows peek and hover when backgrounded', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// simulateAction must not return early if environmentState is backgrounded
+	const simActionIdx = native.indexOf('SimulateAction(const Napi::CallbackInfo');
+	assert.ok(simActionIdx > 0, 'SimulateAction method must exist');
+	const simActionBlock = native.slice(simActionIdx, simActionIdx + 800);
+
+	assert.doesNotMatch(simActionBlock, /isEqualToString:@"backgrounded"/,
+		'SimulateAction must not contain backgrounded early-return guard');
+});
+
+

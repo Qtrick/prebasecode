@@ -11,6 +11,7 @@ import { AccessibleContentProvider, AccessibleViewProviderId, AccessibleViewType
 import { IAccessibleViewImplementation } from '../../../../../platform/accessibility/browser/accessibleViewRegistry.js';
 import { ContextKeyExpr } from '../../../../../platform/contextkey/common/contextkey.js';
 import { IKeybindingService } from '../../../../../platform/keybinding/common/keybinding.js';
+import { IProductService } from '../../../../../platform/product/common/productService.js';
 import { AccessibilityVerbositySettingId } from '../../../accessibility/browser/accessibilityConfiguration.js';
 import { INLINE_CHAT_ID } from '../../../inlineChat/common/inlineChat.js';
 import { TerminalContribCommandId } from '../../../terminal/terminalContribExports.js';
@@ -60,7 +61,7 @@ export class AgentChatAccessibilityHelp implements IAccessibleViewImplementation
 	}
 }
 
-export function getAccessibilityHelpText(type: 'panelChat' | 'inlineChat' | 'quickChat' | 'editsView' | 'agentView', keybindingService: IKeybindingService): string {
+export function getAccessibilityHelpText(type: 'panelChat' | 'inlineChat' | 'quickChat' | 'editsView' | 'agentView', keybindingService: IKeybindingService, isAgentsWindowEnabled: boolean = false): string {
 	const content = [];
 	if (type === 'panelChat' || type === 'quickChat' || type === 'editsView' || type === 'agentView') {
 		content.push(localize('chat.fileChangesDisclosure', 'File change summaries show the total files, additions, and deletions. Focus the disclosure and press Enter or Space to show or hide the individual files.'));
@@ -73,9 +74,11 @@ export function getAccessibilityHelpText(type: 'panelChat' | 'inlineChat' | 'qui
 			content.push(localize('chat.differencePanel', 'The chat view is a persistent interface that also supports navigating suggested follow-up questions, while the quick chat view is a transient interface for making and viewing requests.'));
 			content.push(localize('workbench.action.chat.newChat', 'To create a new chat session, invoke the New Chat command{0}.', '<keybinding:workbench.action.chat.newChat>'));
 			content.push(localize('workbench.action.chat.history', 'To view all chat sessions, invoke the Show Chats command{0}.', '<keybinding:workbench.action.chat.history>'));
-			content.push(localize('workbench.action.chat.focusAgentSessionsViewer', 'You can focus the agent sessions list by invoking the Focus Agent Sessions command{0}.', `<keybinding:${FocusAgentSessionsAction.id}>`));
-			content.push(localize('workbench.action.openAgentsWindow', 'To open the Agents Window, invoke the Open Agents Window command{0}. In screen reader mode, this keybinding includes Alt to avoid conflicts with screen reader shortcuts.', '<keybinding:workbench.action.openAgentsWindow>'));
-			content.push(localize('workbench.action.chat.openAgentHostFolderPicker', 'When starting an agent session in a multi-root workspace, you can choose which root folder it runs in by invoking the Folder command{0}, then selecting a folder from the list.', '<keybinding:workbench.action.chat.openAgentHostFolderPicker>'));
+			if (isAgentsWindowEnabled) {
+				content.push(localize('workbench.action.chat.focusAgentSessionsViewer', 'You can focus the agent sessions list by invoking the Focus Agent Sessions command{0}.', `<keybinding:${FocusAgentSessionsAction.id}>`));
+				content.push(localize('workbench.action.openAgentsWindow', 'To open the Agents Window, invoke the Open Agents Window command{0}. In screen reader mode, this keybinding includes Alt to avoid conflicts with screen reader shortcuts.', '<keybinding:workbench.action.openAgentsWindow>'));
+				content.push(localize('workbench.action.chat.openAgentHostFolderPicker', 'When starting an agent session in a multi-root workspace, you can choose which root folder it runs in by invoking the Folder command{0}, then selecting a folder from the list.', '<keybinding:workbench.action.chat.openAgentHostFolderPicker>'));
+			}
 		}
 		content.push(localize('chat.requestHistory', 'In the input box, use up and down arrows to navigate your request history. Edit input and use enter or the submit button to run a new request.'));
 		content.push(localize('chat.attachments.removal', 'To remove attached contexts, focus an attachment and press Delete or Backspace.'));
@@ -160,7 +163,9 @@ export function getChatAccessibilityHelpProvider(accessor: ServicesAccessor, edi
 
 	const cachedPosition = inputEditor.getPosition();
 	inputEditor.getSupportedActions();
-	const helpText = getAccessibilityHelpText(type, keybindingService);
+	const productService = accessor.get(IProductService);
+	const isAgentsWindowEnabled = Boolean(productService.prebaseAgentsWindowEnabled) || Boolean(process.env['PREBASE_ENABLE_AGENTS_WINDOW']);
+	const helpText = getAccessibilityHelpText(type, keybindingService, isAgentsWindowEnabled);
 	return new AccessibleContentProvider(
 		type === 'panelChat' ? AccessibleViewProviderId.PanelChat : type === 'inlineChat' ? AccessibleViewProviderId.InlineChat : type === 'agentView' ? AccessibleViewProviderId.AgentChat : AccessibleViewProviderId.QuickChat,
 		{ type: AccessibleViewType.Help },

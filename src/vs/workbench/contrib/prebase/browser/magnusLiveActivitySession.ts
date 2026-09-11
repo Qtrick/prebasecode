@@ -12,6 +12,7 @@ import {
 	type LiveActivityCommand,
 	type MagnusLiveActivityPendingInteraction,
 	type MagnusLiveActivitySnapshot,
+	type MagnusLiveActivityTranscriptTurn,
 } from '../../../../platform/prebaseLiveActivity/common/magnusLiveActivity.js';
 
 export function asPlainText(value: unknown): string {
@@ -91,6 +92,41 @@ export function extractPendingFromModel(
 		}
 	}
 	return undefined;
+}
+
+export function extractTranscriptFromModel(
+	model: IChatModel | undefined,
+	maxTurns = 3,
+	maxChars = 140,
+): readonly MagnusLiveActivityTranscriptTurn[] {
+	if (!model) {
+		return [];
+	}
+	const requests = model.getRequests();
+	const turns: MagnusLiveActivityTranscriptTurn[] = [];
+	const startIdx = Math.max(0, requests.length - maxTurns);
+	for (let i = startIdx; i < requests.length; i++) {
+		const req = requests[i];
+		const userMsg = (req.message.text ?? '').trim();
+		if (userMsg) {
+			const sanitized = redactLiveActivityText(userMsg).slice(0, maxChars);
+			turns.push({ role: 'user', text: sanitized });
+		}
+		if (req.response) {
+			let responseText = '';
+			for (const part of req.response.entireResponse.value ?? []) {
+				if (part.kind === 'markdownContent') {
+					responseText += part.content.value;
+				}
+			}
+			responseText = responseText.trim();
+			if (responseText) {
+				const sanitized = redactLiveActivityText(responseText).slice(0, maxChars);
+				turns.push({ role: 'agent', text: sanitized });
+			}
+		}
+	}
+	return turns.slice(-maxTurns * 2);
 }
 
 export async function applyMagnusLiveActivitySessionCommand(

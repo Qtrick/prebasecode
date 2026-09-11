@@ -101,3 +101,19 @@ test('Notch minimized/background interaction: hover and click expansion enabled 
 	// Ensure compact click triggers enterInteractiveSticky
 	assert.match(liveActivityMm, /if\s*\(self\.peekOnly\s*\|\|\s*self\.controller\.attentionPeek\s*\|\|\s*!self\.expanded\)\s*\{\s*\[self\.controller\s+enterInteractiveSticky\];\s*return;\s*\}/, 'Click on compact notch must enter interactive sticky');
 });
+
+test('Agents Window Dormancy: chatAccessibilityHelp suppresses agent window actions when dormant', () => {
+	const helpTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/chat/browser/actions/chatAccessibilityHelp.ts'), 'utf8');
+	assert.match(helpTs, /const isAgentsWindowEnabled = Boolean\(productService\.prebaseAgentsWindowEnabled\) \|\| Boolean\(process\.env\['PREBASE_ENABLE_AGENTS_WINDOW'\]\);/, 'chatAccessibilityHelp must check productService and env override');
+	assert.match(helpTs, /if \(isAgentsWindowEnabled\)\s*\{[\s\S]*focusAgentSessionsViewer[\s\S]*openAgentsWindow[\s\S]*openAgentHostFolderPicker/, 'agent window announcements must be enclosed in isAgentsWindowEnabled check');
+});
+
+test('Notch session management: live_activity.mm provides native session switcher and new session action', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	assert.match(mm, /@property\s*\(nonatomic,\s*strong\)\s*NSButton\s*\*sessionButton;/, 'NSButton sessionButton must exist in native panel');
+	assert.match(mm, /simulateSelectSession:/, 'simulateSelectSession: must be exported for testability');
+	assert.match(mm, /simulateCreateSession/, 'simulateCreateSession must be exported for testability');
+	assert.match(mm, /\[self\s+emit:@"selectSession"/, 'native panel must emit selectSession action');
+	assert.match(mm, /\[self\s+emit:@"createSession"/, 'native panel must emit createSession action');
+});
+

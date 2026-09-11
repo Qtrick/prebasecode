@@ -157,3 +157,44 @@ test('Magnus Notch: In-process native visual snapshot capture works deterministi
 	unlinkSync(testPngPath);
 	native.dispose();
 });
+
+test('Magnus Notch: Diagnostics report sessionButtonVisible when sessions provided', { skip: !hasNative }, async () => {
+	const native = require(addonPath);
+
+	native.setPresentation({
+		visible: true,
+		pinned: false,
+		reducedMotion: true,
+		display: 'builtin'
+	});
+	native.setSnapshot({
+		status: 'working',
+		sessionId: 'sess-abc',
+		sessionTitle: 'Refactor parser',
+		availableSessions: [
+			{ sessionId: 'sess-abc', title: 'Refactor parser', isCurrent: true, startedAt: 1000 },
+			{ sessionId: 'sess-def', title: 'Add tests', isCurrent: false, startedAt: 2000 },
+		],
+		conversationTranscript: [
+			{ role: 'user', content: 'Add parser tests' },
+			{ role: 'agent', content: 'Adding unit tests for parser now' },
+		],
+		revision: 203,
+		connected: true,
+		prebaseForeground: true,
+		isInProgress: true,
+		recentActions: [],
+		startedAt: Date.now() - 3000,
+		userDismissedAttention: false,
+	});
+
+	// Enter interactive sticky mode
+	native.simulateAction('click');
+	await new Promise(r => setTimeout(r, 100));
+
+	const diag = native.getDiagnostics();
+	assert.strictEqual(diag.sessionButtonVisible, true, 'sessionButton must be visible when sessions are available in interactive mode');
+
+	native.dispose();
+});
+

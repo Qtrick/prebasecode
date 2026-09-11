@@ -59,7 +59,7 @@ import {
 	type MagnusLiveActivitySessionInput,
 	type MagnusLiveActivitySnapshot,
 } from '../../../../platform/prebaseLiveActivity/common/magnusLiveActivity.js';
-import { applyMagnusLiveActivitySessionCommand, extractPendingFromModel, asPlainText } from './magnusLiveActivitySession.js';
+import { applyMagnusLiveActivitySessionCommand, extractPendingFromModel, extractTranscriptFromModel, asPlainText } from './magnusLiveActivitySession.js';
 
 function isMagnusModel(model: IChatModel): boolean {
 	const requests = model.getRequests();
@@ -260,6 +260,7 @@ function extractSessionInput(
 		terminalChat?: ITerminalChatService;
 		risk?: { isDestructive(toolId: string, parameters: unknown): boolean };
 		actionLedger?: Map<string, MagnusLiveActivityAction>;
+		availableSessions?: readonly { sessionId: string; sessionResource: string; title: string; isBusy?: boolean }[];
 	} = {},
 ): MagnusLiveActivitySessionInput | undefined {
 	if (!model) {
@@ -284,6 +285,9 @@ function extractSessionInput(
 		sessionResource: model.sessionResource.toString(),
 		startedAt: model.timestamp,
 		title: model.title,
+		sessionTitle: model.title || 'Magnus Session',
+		availableSessions: deps.availableSessions,
+		conversationTranscript: extractTranscriptFromModel(model),
 		isInProgress: model.requestInProgress.get() || model.hasActiveRequest.get(),
 		needsInput: Boolean(model.requestNeedsInput.get() || pending),
 		currentActivity: extractCurrentActivity(last),
@@ -353,6 +357,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		@ITerminalService private readonly terminalService: ITerminalService,
 		@ILanguageModelToolsService private readonly toolsService: ILanguageModelToolsService,
 		@IChatToolRiskAssessmentService private readonly riskAssessmentService: IChatToolRiskAssessmentService,
+		@IChatWidgetService private readonly chatWidgetService: IChatWidgetService,
 	) {
 		super();
 		this._push = this._register(new RunOnceScheduler(() => this._publish(), 120));
@@ -515,7 +520,9 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		if (Date.now() < this._visualFixtureHoldUntil) {
 			return;
 		}
-		const model = selectPrimaryMagnusModel(this.chatService.chatModels.get());
+		const allModels = this.chatService.chatModels.get();
+		const model = selectPrimaryMagnusModel(allModels);
+		const availableSessions = listMagnusSessions(allModels);
 		this._revision += 1;
 		const userHideDetails = Boolean(this.configurationService.getValue<boolean>('prebase.magnus.liveActivity.hideDetails'));
 		const sessionId = model?.sessionId;
@@ -527,6 +534,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			terminalChat: this.terminalChatService,
 			risk: { isDestructive: (toolId, parameters) => this._isDestructive(toolId, parameters) },
 			actionLedger: this._actionLedger,
+			availableSessions,
 		}), {
 			revision: this._revision,
 			prebaseForeground: this.hostService.hasFocus,
@@ -663,6 +671,39 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			this._pinned = false;
 			await this.hostService.focus(mainWindow, { mode: FocusMode.Force });
 			await this.commandService.executeCommand('prebase.magnus.open');
+			this._push.schedule();
+			return;
+		}
+		if (command.kind === 'selectSession') {
+			const targetSessionId = command.targetSessionId || command.sessionId;
+			const targetResourceStr = command.targetSessionResource || command.sessionResource;
+			if (targetSessionId) {
+				const models = this.chatService.chatModels.get();
+				for (const model of models) {
+					if (model.sessionId === targetSessionId && isMagnusModel(model)) {
+						await this.chatWidgetService.openSession(model.sessionResource);
+						this._pinned = true;
+						this._push.schedule();
+						return;
+					}
+				}
+			} else if (targetResourceStr) {
+				const resource = URI.parse(targetResourceStr);
+				await this.chatWidgetService.openSession(resource);
+				this._pinned = true;
+				this._push.schedule();
+				return;
+			}
+			return;
+		}
+		if (command.kind === 'createSession') {
+			const ref = this.chatService.startNewLocalSession(ChatAgentLocation.Chat);
+			try {
+				await this.chatWidgetService.openSession(ref.object.sessionResource);
+			} finally {
+				ref.dispose();
+			}
+			this._pinned = true;
 			this._push.schedule();
 			return;
 		}

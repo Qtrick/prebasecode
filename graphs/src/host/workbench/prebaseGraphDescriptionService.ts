@@ -166,13 +166,22 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 	private _cachedRecord?: Record<string, CacheEntryV9>;
 	private _touchDebounceTimer?: any;
 
+	private readonly workspaceContextService: IWorkspaceContextService;
+	private readonly fileService: IFileService;
+	private readonly storageService: IStorageService;
+	private readonly commandService: ICommandService;
+
 	constructor(
-		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
-		@IFileService private readonly fileService: IFileService,
-		@IStorageService private readonly storageService: IStorageService,
-		@ICommandService private readonly commandService: ICommandService,
+		@IWorkspaceContextService workspaceContextService: IWorkspaceContextService,
+		@IFileService fileService: IFileService,
+		@IStorageService storageService: IStorageService,
+		@ICommandService commandService: ICommandService,
 	) {
 		super();
+		this.workspaceContextService = workspaceContextService;
+		this.fileService = fileService;
+		this.storageService = storageService;
+		this.commandService = commandService;
 
 		if (this.fileService?.onDidFilesChange) {
 			this._register(this.fileService.onDidFilesChange(e => {

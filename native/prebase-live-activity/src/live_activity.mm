@@ -686,6 +686,10 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) NSTextField *pendingInteractionMessage;
 @property (nonatomic, strong) NSTextField *expandedMetricsLabel;
 
+@property (nonatomic, copy) NSString *sessionTitle;
+@property (nonatomic, copy) NSArray<NSDictionary *> *conversationTranscript;
+@property (nonatomic, strong) NSMutableArray<NSTextField *> *transcriptLabels;
+
 @property (nonatomic, copy) NSString *statusLabel;
 @property (nonatomic, copy) NSString *activityLabel;
 @property (nonatomic, copy) NSString *latestMessage;
@@ -786,6 +790,10 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL hasLaidOutOnce;
 @property (nonatomic, copy) NSString *environmentState;
 @property (nonatomic, copy) NSString *simulatedEnvironmentState;
+@property (nonatomic, copy) NSString *sessionTitle;
+@property (nonatomic, copy) NSArray<NSDictionary *> *availableSessions;
+@property (nonatomic, copy) NSArray<NSDictionary *> *conversationTranscript;
+@property (nonatomic, strong) NSButton *sessionButton;
 
 - (void)recomputeEnvironmentState;
 - (void)applySnapshotDict:(NSDictionary *)snapshot;
@@ -812,6 +820,11 @@ static NSString *JSString(Napi::Value value) {
 - (BOOL)simulateClickDeny;
 - (BOOL)simulateSubmitFollowUp:(NSString *)text;
 - (BOOL)simulateClickOpenInPrebase;
+- (void)showSessionMenu:(id)sender;
+- (void)selectSessionFromMenu:(NSMenuItem *)sender;
+- (void)createNewSessionFromMenu:(NSMenuItem *)sender;
+- (BOOL)simulateSelectSession:(NSString *)sessionId;
+- (BOOL)simulateCreateSession;
 - (void)installLocalKeyMonitor;
 - (void)removeLocalKeyMonitor;
 - (void)expandPreview;
@@ -934,6 +947,15 @@ static NSString *JSString(Napi::Value value) {
 		_expandedMetricsLabel = [self makeLabel:10 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.58 alpha:1.0]];
 		_expandedMetricsLabel.font = [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular];
 		[_contentDocumentView addSubview:_expandedMetricsLabel];
+
+		_transcriptLabels = [NSMutableArray array];
+		for (NSInteger i = 0; i < 6; i++) {
+			NSTextField *tLabel = [self makeLabel:11.0 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.84 alpha:1.0]];
+			[self configureLabel:tLabel lines:2 truncating:YES];
+			tLabel.hidden = YES;
+			[_transcriptLabels addObject:tLabel];
+			[_contentDocumentView addSubview:tLabel];
+		}
 	}
 	return self;
 }
@@ -1342,8 +1364,32 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat headerW = MAX(40, totalW - headerInset * 2);
 	CGFloat statusW = MIN(headerW * 0.40, MAX(44, [statusText sizeWithAttributes:@{ NSFontAttributeName: self.statusBadge.font }].width + 4));
 	CGFloat titleW = MAX(48, headerW - statusW - 8);
-	self.headerTitle.stringValue = @"Magnus";
-	self.headerTitle.frame = NSMakeRect(headerInset, y, titleW, kHeaderRowHeight);
+
+	if (self.controller.sessionButton) {
+		if (self.controller.availableSessions.count > 0 || self.controller.sessionTitle.length > 0) {
+			NSString *sessionName = self.controller.sessionTitle.length ? self.controller.sessionTitle : @"Magnus";
+			NSString *buttonTitle = [NSString stringWithFormat:@"%@ ▾", sessionName];
+			self.controller.sessionButton.title = buttonTitle;
+			NSDictionary *attrs = @{
+				NSFontAttributeName: [NSFont systemFontOfSize:11.5 weight:NSFontWeightSemibold],
+				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.96 alpha:1.0]
+			};
+			self.controller.sessionButton.attributedTitle = [[NSAttributedString alloc] initWithString:buttonTitle attributes:attrs];
+			CGFloat measuredW = [buttonTitle sizeWithAttributes:attrs].width + 16;
+			CGFloat sessionW = MIN(titleW, MAX(60, measuredW));
+			self.controller.sessionButton.frame = NSMakeRect(headerInset, y - 2, sessionW, kHeaderRowHeight + 4);
+			self.controller.sessionButton.hidden = NO;
+			self.headerTitle.hidden = YES;
+		} else {
+			self.controller.sessionButton.hidden = YES;
+			self.headerTitle.hidden = NO;
+			self.headerTitle.stringValue = @"Magnus";
+			self.headerTitle.frame = NSMakeRect(headerInset, y, titleW, kHeaderRowHeight);
+		}
+	} else {
+		self.headerTitle.stringValue = @"Magnus";
+		self.headerTitle.frame = NSMakeRect(headerInset, y, titleW, kHeaderRowHeight);
+	}
 	self.statusBadge.frame = NSMakeRect(totalW - headerInset - statusW, y, statusW, kHeaderRowHeight);
 	y += kHeaderRowHeight + kContentGap;
 
@@ -1358,6 +1404,9 @@ static NSString *JSString(Napi::Value value) {
 	self.pendingInteractionTitle.hidden = YES;
 	self.pendingInteractionMessage.hidden = YES;
 	self.expandedMetricsLabel.hidden = YES;
+	for (NSTextField *tLabel in self.transcriptLabels) {
+		tLabel.hidden = YES;
+	}
 	// Hide labels only — keep actionRowIds so reconcile can preserve slot identity.
 	for (NSInteger i = 0; i < (NSInteger)self.actionLabels.count; i++) {
 		self.actionLabels[i].hidden = YES;
@@ -1377,6 +1426,27 @@ static NSString *JSString(Napi::Value value) {
 	}
 	// Approval/question: pending is primary — do not fight with activity/action log.
 	if (!hasPending) {
+		if (self.conversationTranscript.count > 0) {
+			NSInteger tIdx = 0;
+			NSInteger startTurn = (NSInteger)self.conversationTranscript.count > 4 ? (NSInteger)self.conversationTranscript.count - 4 : 0;
+			for (NSInteger i = startTurn; i < (NSInteger)self.conversationTranscript.count && tIdx < (NSInteger)self.transcriptLabels.count; i++) {
+				NSDictionary *turn = self.conversationTranscript[i];
+				NSString *role = turn[@"role"] ?: @"agent";
+				NSString *tText = turn[@"text"] ?: @"";
+				if (tText.length == 0) {
+					continue;
+				}
+				NSTextField *tField = self.transcriptLabels[tIdx++];
+				BOOL isUser = [role isEqualToString:@"user"];
+				NSString *prefix = isUser ? @"You: " : @"Magnus: ";
+				NSString *fullText = [prefix stringByAppendingString:tText];
+				tField.font = [NSFont systemFontOfSize:11.0 weight:isUser ? NSFontWeightMedium : NSFontWeightRegular];
+				tField.textColor = isUser
+					? [NSColor colorWithCalibratedWhite:0.72 alpha:1.0]
+					: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0];
+				[self placeContentBlock:tField text:fullText lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
+			}
+		}
 		NSString *displayActivity = ResolveHumanReadableActivity(self.activityLabel, self.latestMessage);
 		if (ok && displayActivity.length) {
 			ok = [self placeContentBlock:self.activityDescription text:displayActivity lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
@@ -1803,7 +1873,7 @@ static NSString *JSString(Napi::Value value) {
 			if (self.panel && [self.environmentState isEqualToString:@"fullscreenSuppressed"]) {
 				[self.panel orderOut:nil];
 			}
-		} else if ([self.environmentState isEqualToString:@"available"] && self.visible) {
+		} else if (([self.environmentState isEqualToString:@"available"] || [self.environmentState isEqualToString:@"backgrounded"]) && self.visible) {
 			if (self.panel && !self.panel.isVisible) {
 				[self.panel orderFront:nil];
 			}
@@ -1867,6 +1937,9 @@ static NSString *JSString(Napi::Value value) {
 		}
 	} else if (!isPrebaseFrontmost) {
 		self.environmentState = @"backgrounded";
+		if (self.visible && self.panel && !self.panel.isVisible) {
+			[self.panel orderFront:nil];
+		}
 	} else {
 		self.environmentState = @"available";
 		if (self.visible && self.panel && !self.panel.isVisible) {
@@ -1930,6 +2003,18 @@ static NSString *JSString(Napi::Value value) {
 	self.input.action = @selector(submitFollowUp:);
 	self.input.accessibilityLabel = @"Message Magnus";
 	[self.content.expandedContainer addSubview:self.input];
+
+	self.sessionButton = [[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 120, kHeaderRowHeight + 2)];
+	self.sessionButton.bezelStyle = NSBezelStyleInline;
+	self.sessionButton.bordered = NO;
+	self.sessionButton.wantsLayer = YES;
+	self.sessionButton.layer.cornerRadius = 6.0;
+	self.sessionButton.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.20 alpha:0.75].CGColor;
+	self.sessionButton.target = self;
+	self.sessionButton.action = @selector(showSessionMenu:);
+	self.sessionButton.hidden = YES;
+	self.sessionButton.accessibilityLabel = @"Select Magnus session";
+	[self.content.expandedContainer addSubview:self.sessionButton];
 
 	self.openButton = [self makeIconButton:@"arrow.up.right.square" accessibilityLabel:@"Open in PreBase" action:@selector(openInPrebase:)];
 	self.pinButton = [self makeIconButton:@"pin" accessibilityLabel:@"Pin panel" action:@selector(togglePin:)];
@@ -2652,14 +2737,6 @@ static NSString *JSString(Napi::Value value) {
 		self.approveButton.attributedTitle = [[NSAttributedString alloc] initWithString:approveTitle attributes:apprAttrs];
 		self.approveButton.accessibilityLabel = self.actionInFlight ? @"Approve (in progress)" : approveTitle;
 
-		if (self.pendingDestructive) {
-			self.approveButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.72 green:0.20 blue:0.20 alpha:0.95].CGColor;
-			self.approveButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.88 green:0.35 blue:0.35 alpha:0.55].CGColor;
-		} else {
-			self.approveButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.16 green:0.54 blue:0.32 alpha:0.95].CGColor;
-			self.approveButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.30 green:0.72 blue:0.46 alpha:0.55].CGColor;
-		}
-
 		self.denyButton.title = @"Deny";
 		NSDictionary *denyAttrs = @{
 			NSFontAttributeName: self.denyButton.font ?: [NSFont systemFontOfSize:11.5 weight:NSFontWeightMedium],
@@ -2667,13 +2744,24 @@ static NSString *JSString(Napi::Value value) {
 		};
 		self.denyButton.attributedTitle = [[NSAttributedString alloc] initWithString:@"Deny" attributes:denyAttrs];
 		self.denyButton.accessibilityLabel = self.actionInFlight ? @"Deny (in progress)" : @"Deny";
-		self.denyButton.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.18 alpha:0.90].CGColor;
-		self.denyButton.layer.borderColor = [NSColor colorWithCalibratedWhite:0.36 alpha:0.45].CGColor;
 
+		// Balanced 50/50 buttons with refined dark mode styling
 		CGFloat apprGap = 8;
-		CGFloat denyRatio = self.pendingDestructive ? 0.36 : 0.42;
-		CGFloat denyW = floor((usableW - apprGap) * denyRatio);
+		CGFloat denyW = floor((usableW - apprGap) / 2.0);
 		CGFloat approveW = usableW - apprGap - denyW;
+
+		if (self.pendingDestructive) {
+			self.approveButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.76 green:0.22 blue:0.22 alpha:0.95].CGColor;
+			self.approveButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.90 green:0.35 blue:0.35 alpha:0.60].CGColor;
+			self.denyButton.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.24 alpha:0.95].CGColor;
+			self.denyButton.layer.borderColor = [NSColor colorWithCalibratedWhite:0.42 alpha:0.55].CGColor;
+		} else {
+			self.approveButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.15 green:0.58 blue:0.34 alpha:0.95].CGColor;
+			self.approveButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.28 green:0.75 blue:0.46 alpha:0.60].CGColor;
+			self.denyButton.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.20 alpha:0.92].CGColor;
+			self.denyButton.layer.borderColor = [NSColor colorWithCalibratedWhite:0.38 alpha:0.50].CGColor;
+		}
+
 		self.denyButton.frame = NSMakeRect(footerInset, bottomY, denyW, kControlHeight);
 		self.approveButton.frame = NSMakeRect(footerInset + denyW + apprGap, bottomY, approveW, kControlHeight);
 		return;
@@ -3151,6 +3239,62 @@ static NSString *JSString(Napi::Value value) {
 	// Keep pending interaction visible until snapshot acknowledges resolution.
 }
 
+- (void)showSessionMenu:(id)sender {
+	NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Magnus Sessions"];
+	if (self.availableSessions.count > 0) {
+		for (NSDictionary *session in self.availableSessions) {
+			NSString *sid = session[@"sessionId"];
+			NSString *stitle = session[@"title"] ?: @"Session";
+			BOOL isCurrent = [sid isEqualToString:self.sessionId];
+			NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:stitle action:@selector(selectSessionFromMenu:) keyEquivalent:@""];
+			item.target = self;
+			item.representedObject = session;
+			item.state = isCurrent ? NSControlStateValueOn : NSControlStateValueOff;
+			[menu addItem:item];
+		}
+		[menu addItem:[NSMenuItem separatorItem]];
+	}
+	NSMenuItem *newItem = [[NSMenuItem alloc] initWithTitle:@"＋ New Session" action:@selector(createNewSessionFromMenu:) keyEquivalent:@"n"];
+	newItem.target = self;
+	[menu addItem:newItem];
+
+	NSPoint loc = [self.sessionButton convertPoint:NSMakePoint(0, NSHeight(self.sessionButton.frame) + 4) toView:nil];
+	[menu popUpMenuPositioningItem:nil atLocation:loc inView:self.content.expandedContainer];
+}
+
+- (void)selectSessionFromMenu:(NSMenuItem *)sender {
+	NSDictionary *session = sender.representedObject;
+	if (!session) {
+		return;
+	}
+	NSString *sid = session[@"sessionId"];
+	NSString *sres = session[@"sessionResource"];
+	[self emit:@"selectSession" extras:@{
+		@"targetSessionId": sid ?: @"",
+		@"targetSessionResource": sres ?: @""
+	}];
+}
+
+- (void)createNewSessionFromMenu:(NSMenuItem *)sender {
+	[self emit:@"createSession" extras:@{}];
+}
+
+- (BOOL)simulateSelectSession:(NSString *)sessionId {
+	if (self.screenLocked || sessionId.length == 0) {
+		return NO;
+	}
+	[self emit:@"selectSession" extras:@{ @"targetSessionId": sessionId }];
+	return YES;
+}
+
+- (BOOL)simulateCreateSession {
+	if (self.screenLocked) {
+		return NO;
+	}
+	[self emit:@"createSession" extras:@{}];
+	return YES;
+}
+
 - (void)beginActionInFlight {
 	self.actionInFlight = YES;
 	self.approveButton.enabled = NO;
@@ -3403,6 +3547,10 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"composerVisible"] = @(!self.input.hidden);
 	dict[@"screenLocked"] = @(self.screenLocked);
 	dict[@"environmentState"] = self.environmentState ?: @"available";
+	dict[@"sessionButtonVisible"] = @(self.sessionButton != nil && !self.sessionButton.hidden);
+	dict[@"sessionTitle"] = self.sessionTitle ?: @"";
+	dict[@"availableSessionCount"] = @(self.availableSessions.count);
+	dict[@"conversationTranscriptCount"] = @(self.conversationTranscript.count);
 	dict[@"approvalControlsVisible"] = @(!self.approveButton.hidden);
 	dict[@"openInPreBaseVisible"] = @(!self.openButton.hidden);
 	dict[@"pinButtonVisible"] = @(!self.pinButton.hidden);
@@ -3876,6 +4024,11 @@ static NSString *JSString(Napi::Value value) {
 
 	self.sessionId = snapshot[@"sessionId"] ?: @"";
 	self.sessionResource = snapshot[@"sessionResource"] ?: @"";
+	self.sessionTitle = snapshot[@"sessionTitle"] ?: @"";
+	self.availableSessions = snapshot[@"availableSessions"] ?: @[];
+	self.conversationTranscript = snapshot[@"conversationTranscript"] ?: @[];
+	self.content.sessionTitle = self.sessionTitle;
+	self.content.conversationTranscript = self.conversationTranscript;
 	self.revision = incomingRevision;
 	NSString *previousStatus = self.content.status ?: @"";
 	NSString *status = snapshot[@"status"] ?: @"";
@@ -4165,6 +4318,7 @@ static NSString *JSString(Napi::Value value) {
 	self.panel.contentView = nil;
 	[self.panel close];
 	self.panel = nil;
+	self.sessionButton = nil;
 	self.content = nil;
 }
 
@@ -4194,6 +4348,52 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 	payload[@"taskTitle"] = JSString(snapshot.Get("taskTitle"));
 	payload[@"presentationLabel"] = JSString(snapshot.Get("presentationLabel"));
 	payload[@"latestShortMessage"] = JSString(snapshot.Get("latestShortMessage"));
+	payload[@"sessionTitle"] = JSString(snapshot.Get("sessionTitle"));
+
+	NSMutableArray *availableSessions = [NSMutableArray array];
+	if (snapshot.Get("availableSessions").IsArray()) {
+		Napi::Array arr = snapshot.Get("availableSessions").As<Napi::Array>();
+		for (uint32_t i = 0; i < arr.Length(); i++) {
+			Napi::Value item = arr.Get(i);
+			if (item.IsObject()) {
+				Napi::Object obj = item.As<Napi::Object>();
+				NSString *sid = JSString(obj.Get("sessionId"));
+				NSString *sres = JSString(obj.Get("sessionResource"));
+				NSString *stitle = JSString(obj.Get("title"));
+				BOOL isBusy = obj.Get("isBusy").IsBoolean() && obj.Get("isBusy").As<Napi::Boolean>().Value();
+				if (sid.length > 0) {
+					[availableSessions addObject:@{
+						@"sessionId": sid,
+						@"sessionResource": sres ?: @"",
+						@"title": stitle ?: @"Magnus Session",
+						@"isBusy": @(isBusy)
+					}];
+				}
+			}
+		}
+	}
+	payload[@"availableSessions"] = availableSessions;
+
+	NSMutableArray *transcript = [NSMutableArray array];
+	if (snapshot.Get("conversationTranscript").IsArray()) {
+		Napi::Array arr = snapshot.Get("conversationTranscript").As<Napi::Array>();
+		for (uint32_t i = 0; i < arr.Length(); i++) {
+			Napi::Value item = arr.Get(i);
+			if (item.IsObject()) {
+				Napi::Object obj = item.As<Napi::Object>();
+				NSString *role = JSString(obj.Get("role"));
+				NSString *text = JSString(obj.Get("text"));
+				if (text.length > 0) {
+					[transcript addObject:@{
+						@"role": role ?: @"agent",
+						@"text": text
+					}];
+				}
+			}
+		}
+	}
+	payload[@"conversationTranscript"] = transcript;
+
 	if (snapshot.Get("screenLocked").IsBoolean() && snapshot.Get("screenLocked").As<Napi::Boolean>().Value()) {
 		payload[@"screenLocked"] = @YES;
 	} else {
@@ -4417,12 +4617,16 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 		if ([controller.environmentState isEqualToString:@"fullscreenSuppressed"] || [controller.environmentState isEqualToString:@"screenLocked"]) {
 			return Napi::Boolean::New(env, false);
 		}
-		if ([controller.environmentState isEqualToString:@"backgrounded"] && !controller.content.attention) {
-			return Napi::Boolean::New(env, false);
-		}
 		[controller expandPeek];
 		// Fail closed when expandPeek no-ops (lock / hidden / fullscreen policy).
 		return Napi::Boolean::New(env, controller.content.peekOnly == YES);
+	}
+	if (action == "selectSession" && info.Length() >= 2 && info[1].IsString()) {
+		NSString *sid = [NSString stringWithUTF8String:info[1].As<Napi::String>().Utf8Value().c_str()];
+		return Napi::Boolean::New(env, [controller simulateSelectSession:sid]);
+	}
+	if (action == "createSession") {
+		return Napi::Boolean::New(env, [controller simulateCreateSession]);
 	}
 	if (action == "interactive") {
 		// Sticky Interactive must match physical click / simulateAction("click").

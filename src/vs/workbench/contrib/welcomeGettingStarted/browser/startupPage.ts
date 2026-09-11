@@ -241,7 +241,7 @@ export class StartupPageRunnerContribution extends Disposable implements IWorkbe
 	private tryShowOnboarding(): void {
 		// PreBase has a product-owned provider gate and versioned onboarding editor.
 		// Do not layer the generic VS Code/Copilot welcome overlay above it. Product
-		// names differ in source launches ("PreBase Dev"), so use the stable agent ID.
+		// names use the canonical PreBase product identity, and we use the stable agent ID.
 		if (isPreBaseMagnusProduct(this.productService)) {
 			return;
 		}
