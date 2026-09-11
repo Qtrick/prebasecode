@@ -25,8 +25,9 @@ import { ChatRequestAgentSubcommandPart, ChatRequestDynamicVariablePart, ChatReq
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
 import { TipEligibilityTracker } from './chatTipEligibilityTracker.js';
 import { ChatTipExperiment, ChatTipTier, extractCommandIds, ITipBuildContext, ITipDefinition, TIP_CATALOG } from './chatTipCatalog.js';
-import { ChatTipStorageKeys, TipTrackingCommands } from './chatTipStorageKeys.js';
+import { TipTrackingCommands, ChatTipStorageKeys } from './chatTipStorageKeys.js';
 import { IWorkbenchAssignmentService } from '../../../services/assignment/common/assignmentService.js';
+import { isAgentsWindowEnabled } from '../common/agentsWindowCapability.js';
 
 type ChatTipEvent = {
 	tipId: string;
@@ -807,6 +808,9 @@ export class ChatTipService extends Disposable implements IChatTipService {
 	}
 
 	private _fetchExperimentalTipMessages(): void {
+		if (!isAgentsWindowEnabled(this._productService)) {
+			return;
+		}
 		this._assignmentService.getTreatment<string>(ChatTipExperiment.OpenAgentsWindowTip).then(value => {
 			if (typeof value === 'string' && value.length > 0) {
 				this._experimentalTipMessages.set(ChatTipExperiment.OpenAgentsWindowTip, value);

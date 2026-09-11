@@ -86,16 +86,17 @@ function selectPrimaryMagnusModel(models: Iterable<IChatModel>): IChatModel | un
 }
 
 /** List all active Magnus sessions for notch session switcher. */
-function listMagnusSessions(models: Iterable<IChatModel>): { sessionId: string; sessionResource: string; title: string; isBusy: boolean; lastMessageDate: number }[] {
+function listMagnusSessions(models: Iterable<IChatModel>, selectedSessionId?: string): { sessionId: string; sessionResource: string; title: string; isBusy: boolean; lastMessageDate: number }[] {
 	const result: { sessionId: string; sessionResource: string; title: string; isBusy: boolean; lastMessageDate: number }[] = [];
 	for (const model of models) {
-		if (!isMagnusModel(model)) {
+		const isCanonicalSelected = selectedSessionId !== undefined && model.sessionId === selectedSessionId;
+		if (!isMagnusModel(model) && !isCanonicalSelected) {
 			continue;
 		}
 		result.push({
 			sessionId: model.sessionId,
 			sessionResource: model.sessionResource.toString(),
-			title: model.title || 'Untitled session',
+			title: model.title || (isCanonicalSelected && model.getRequests().length === 0 ? 'New Magnus Session' : 'Untitled session'),
 			isBusy: model.requestInProgress.get() || model.hasActiveRequest.get() || Boolean(model.requestNeedsInput.get()),
 			lastMessageDate: model.lastMessageDate,
 		});
@@ -337,6 +338,8 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 	private _visualFixtureHoldUntil = 0;
 	private _lastSnapshot: MagnusLiveActivitySnapshot | undefined;
 	private _actionLedgerSessionId: string | undefined;
+	private _selectedSessionId: string | undefined;
+	private _selectedSessionResource: string | undefined;
 	private readonly _actionLedger = new Map<string, MagnusLiveActivityAction>();
 	private readonly _modelListeners = this._register(new DisposableStore());
 	private readonly _push: RunOnceScheduler;
@@ -374,7 +377,13 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		}
 
 		this._register(this.chatService.onDidCreateModel(() => this._bindModels()));
-		this._register(this.chatService.onDidDisposeSession(() => this._bindModels()));
+		this._register(this.chatService.onDidDisposeSession(e => {
+			if (this._selectedSessionResource && e.sessionResources.some(r => r.toString() === this._selectedSessionResource)) {
+				this._selectedSessionId = undefined;
+				this._selectedSessionResource = undefined;
+			}
+			this._bindModels();
+		}));
 		this._register(this.hostService.onDidChangeFocus(() => this._push.schedule()));
 		// Register + dispose/change: tool-session terminals drop out of the map on dispose without a dedicated chat event.
 		this._register(Event.any(
@@ -521,8 +530,29 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			return;
 		}
 		const allModels = this.chatService.chatModels.get();
-		const model = selectPrimaryMagnusModel(allModels);
-		const availableSessions = listMagnusSessions(allModels);
+		let model: IChatModel | undefined;
+		if (this._selectedSessionId) {
+			model = allModels.find(m => m.sessionId === this._selectedSessionId);
+			if (model) {
+				if (!isMagnusModel(model) && model.getRequests().length > 0) {
+					// Non-Magnus requests finished on this session; reset canonical selection
+					this._selectedSessionId = undefined;
+					this._selectedSessionResource = undefined;
+					model = undefined;
+				}
+			} else {
+				this._selectedSessionId = undefined;
+				this._selectedSessionResource = undefined;
+			}
+		}
+		if (!model) {
+			model = selectPrimaryMagnusModel(allModels);
+			if (model) {
+				this._selectedSessionId = model.sessionId;
+				this._selectedSessionResource = model.sessionResource.toString();
+			}
+		}
+		const availableSessions = listMagnusSessions(allModels, this._selectedSessionId);
 		this._revision += 1;
 		const userHideDetails = Boolean(this.configurationService.getValue<boolean>('prebase.magnus.liveActivity.hideDetails'));
 		const sessionId = model?.sessionId;
@@ -677,29 +707,31 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		if (command.kind === 'selectSession') {
 			const targetSessionId = command.targetSessionId || command.sessionId;
 			const targetResourceStr = command.targetSessionResource || command.sessionResource;
+			const allModels = this.chatService.chatModels.get();
+			let targetModel: IChatModel | undefined;
 			if (targetSessionId) {
-				const models = this.chatService.chatModels.get();
-				for (const model of models) {
-					if (model.sessionId === targetSessionId && isMagnusModel(model)) {
-						await this.chatWidgetService.openSession(model.sessionResource);
-						this._pinned = true;
-						this._push.schedule();
-						return;
-					}
-				}
+				targetModel = allModels.find(m => m.sessionId === targetSessionId && (isMagnusModel(m) || m.sessionId === this._selectedSessionId));
 			} else if (targetResourceStr) {
-				const resource = URI.parse(targetResourceStr);
-				await this.chatWidgetService.openSession(resource);
+				targetModel = allModels.find(m => m.sessionResource.toString() === targetResourceStr && (isMagnusModel(m) || m.sessionId === this._selectedSessionId));
+			}
+			if (targetModel) {
+				this._selectedSessionId = targetModel.sessionId;
+				this._selectedSessionResource = targetModel.sessionResource.toString();
+				await this.chatWidgetService.openSession(targetModel.sessionResource);
 				this._pinned = true;
 				this._push.schedule();
 				return;
 			}
+			this.logService.info('[MagnusLiveActivity] selectSession failed closed: session not found or invalid');
 			return;
 		}
 		if (command.kind === 'createSession') {
 			const ref = this.chatService.startNewLocalSession(ChatAgentLocation.Chat);
 			try {
-				await this.chatWidgetService.openSession(ref.object.sessionResource);
+				const model = ref.object;
+				this._selectedSessionId = model.sessionId;
+				this._selectedSessionResource = model.sessionResource.toString();
+				await this.chatWidgetService.openSession(model.sessionResource);
 			} finally {
 				ref.dispose();
 			}

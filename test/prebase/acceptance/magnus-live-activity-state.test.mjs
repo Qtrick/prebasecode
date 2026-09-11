@@ -967,4 +967,124 @@ test('native backgrounded interaction: simulateAction allows peek and hover when
 		'SimulateAction must not contain backgrounded early-return guard');
 });
 
+test('canonical notch session selection: explicit selected session survives republish over busy heuristic and falls back on disposal', () => {
+	const contribTs = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
+
+	// Explicit selected session identity properties
+	assert.match(contribTs, /private _selectedSessionId: string \| undefined;/, 'Must store _selectedSessionId');
+	assert.match(contribTs, /private _selectedSessionResource: string \| undefined;/, 'Must store _selectedSessionResource');
+
+	// In _publish(), prioritize _selectedSessionId
+	assert.match(contribTs, /if \(this\._selectedSessionId\)\s*\{\s*model = allModels\.find\(m => m\.sessionId === this\._selectedSessionId\);/,
+		'_publish must prioritize _selectedSessionId over heuristic ranking');
+
+	// In selectSession command, store _selectedSessionId and _selectedSessionResource
+	assert.match(contribTs, /if \(command\.kind === 'selectSession'\)\s*\{[\s\S]*this\._selectedSessionId = targetModel\.sessionId;[\s\S]*this\._selectedSessionResource = targetModel\.sessionResource\.toString\(\);/,
+		'selectSession must establish canonical selected session identity');
+
+	// In onDidDisposeSession, clear canonical IDs if the disposed session was selected
+	assert.match(contribTs, /onDidDisposeSession\(e =>\s*\{[\s\S]*if \(this\._selectedSessionResource && e\.sessionResources\.some\(r => r\.toString\(\) === this\._selectedSessionResource\)\)\s*\{\s*this\._selectedSessionId = undefined;\s*this\._selectedSessionResource = undefined;\s*\}/,
+		'Disposal of canonical selected session must clear selection and fall back deterministically');
+
+	// Behavioral verification: stale session fails closed in acceptLiveActivityCommand
+	const script = `
+import assert from 'node:assert/strict';
+import {
+	acceptLiveActivityCommand,
+	buildMagnusLiveActivitySnapshot,
+} from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
+
+const snapshot = buildMagnusLiveActivitySnapshot({
+	sessionId: 'session-B',
+	sessionResource: 'vscode-chat://local/session-B',
+	startedAt: 1000,
+	title: 'Selected Session B',
+	isInProgress: true,
+	currentActivity: 'Editing',
+}, { revision: 10, prebaseForeground: false, connected: true });
+
+// Valid followUp to selected session B succeeds
+const validRes = acceptLiveActivityCommand(snapshot, { kind: 'followUp', sessionId: 'session-B', sessionResource: 'vscode-chat://local/session-B', text: 'Hello B' });
+assert.strictEqual(validRes.ok, true, 'Valid command to selected session must be accepted');
+
+// Stale command targeting session A must be rejected
+const staleRes = acceptLiveActivityCommand(snapshot, { kind: 'followUp', sessionId: 'session-A', sessionResource: 'vscode-chat://local/session-A', text: 'Hello A' });
+assert.strictEqual(staleRes.ok, false, 'Command targeting stale session A must be rejected');
+assert.strictEqual(staleRes.reason, 'session-mismatch');
+`;
+	const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+		cwd: repoRoot,
+		encoding: 'utf8',
+	});
+	assert.strictEqual(child.status, 0, child.stderr || child.stdout);
+});
+
+test('new Magnus session: initial followUp attaches agentId prebase.magnus.agent and switcher includes new session', () => {
+	const contribTs = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
+	const sessionTs = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts'), 'utf8');
+
+	// createSession command establishes canonical selection
+	assert.match(contribTs, /if \(command\.kind === 'createSession'\)\s*\{[\s\S]*const model = ref\.object;[\s\S]*this\._selectedSessionId = model\.sessionId;[\s\S]*this\._selectedSessionResource = model\.sessionResource\.toString\(\);/,
+		'createSession must assign newly created session as canonical selected session');
+
+	// listMagnusSessions includes newly created canonical session with title 'New Magnus Session'
+	assert.match(contribTs, /function listMagnusSessions\(models: Iterable<IChatModel>, selectedSessionId\?: string\)/,
+		'listMagnusSessions must accept selectedSessionId');
+	assert.match(contribTs, /'New Magnus Session'/,
+		'Empty canonical selected session must display "New Magnus Session" in switcher');
+
+	// followUp on empty model routes with agentId: 'prebase.magnus.agent'
+	assert.match(sessionTs, /const isInitialRequest = requests\.length === 0;/,
+		'applyMagnusLiveActivitySessionCommand must detect initial request on new session');
+	assert.match(sessionTs, /const options = isInitialRequest \? \{ agentId: 'prebase\.magnus\.agent' \} : undefined;/,
+		'applyMagnusLiveActivitySessionCommand must target prebase.magnus.agent on initial request');
+	assert.match(sessionTs, /await deps\.chatService\.sendRequest\(sessionResource, text, options\);/,
+		'sendRequest must pass options with agentId');
+});
+
+test('native text containment and typography: ordinary words not broken while paths and extreme tokens sanitize safely', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// SanitizeTextForContainment must allow normal English words up to 28 chars without breaking
+	assert.match(native, /isPureLetters/, 'SanitizeTextForContainment must track pure alphabetical words');
+	assert.match(native, /runLength >= 28/, 'Pure letter words must be permitted up to 28 characters without split');
+	assert.match(native, /runLength >= 24/, 'Mixed alphanumeric runs (hashes/tokens) must break at 24 characters');
+	assert.match(native, /ch == '\/' \|\| ch == '\\\\' \|\| ch == '\?' \|\| ch == '&'/, 'Paths and URLs must break after delimiters');
+});
+
+test('native session button truncation and accessibility: tail truncation paragraph style and tooltips', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// Button lineBreakMode and paragraph style must truncate tail
+	assert.match(native, /btnStyle\.lineBreakMode = NSLineBreakByTruncatingTail;/,
+		'sessionButton paragraph style must use NSLineBreakByTruncatingTail');
+	assert.match(native, /self\.controller\.sessionButton\.cell\.lineBreakMode = NSLineBreakByTruncatingTail;/,
+		'sessionButton cell must use NSLineBreakByTruncatingTail');
+	assert.match(native, /self\.controller\.sessionButton\.toolTip = sessionName;/,
+		'sessionButton must set tooltip to full sessionName');
+	assert.match(native, /self\.controller\.sessionButton\.accessibilityLabel = \[NSString stringWithFormat:@"Current session: %@", sessionName\];/,
+		'sessionButton must set accessibilityLabel');
+});
+
+test('native conversation projection: distinct YOU/MAGNUS role styling, bounded turns, and suppression on pending', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// Must have placeAttributedBlock
+	assert.match(native, /- \(BOOL\)placeAttributedBlock:\(NSTextField \*\)field attributedString:\(NSAttributedString \*\)attrString/,
+		'placeAttributedBlock must exist in native panel');
+
+	// Must format YOU badge and MAGNUS badge
+	assert.match(native, /NSString \*badgeStr = isUser \? @"YOU" : @"MAGNUS";/,
+		'Conversation projection must use distinct YOU vs MAGNUS badges');
+	assert.match(native, /startTurn = \(NSInteger\)self\.conversationTranscript\.count > 3 \? \(NSInteger\)self\.conversationTranscript\.count - 3 : 0;/,
+		'Conversation projection must bound context to last 2-3 turns');
+
+	// Must be suppressed when hasPending is YES
+	const pendIdx = native.indexOf('if (!hasPending) {');
+	const transcriptIdx = native.indexOf('if (self.conversationTranscript.count > 0) {');
+	assert.ok(pendIdx > 0, 'hasPending check must exist');
+	assert.ok(transcriptIdx > pendIdx, 'conversationTranscript rendering must be enclosed in !hasPending block');
+});
+
+
 

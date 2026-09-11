@@ -316,6 +316,10 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
 	}
 
 	async openAgentsWindow(windowId: number | undefined, options?: { folderUri?: UriComponents; sessionResource?: UriComponents }): Promise<void> {
+		if (this.productService.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
+			this.logService.info('nativeHost#openAgentsWindow suppressed: Agents window is dormant');
+			return;
+		}
 		const windows = await this.windowsMainService.openAgentsWindow({
 			context: OpenContext.API,
 			contextWindowId: windowId,

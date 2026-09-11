@@ -198,3 +198,129 @@ test('Magnus Notch: Diagnostics report sessionButtonVisible when sessions provid
 	native.dispose();
 });
 
+test('Magnus Notch: Visual verification of long title session button stability', { skip: !hasNative }, async () => {
+	const native = require(addonPath);
+
+	native.setPresentation({
+		visible: true,
+		pinned: true,
+		reducedMotion: true,
+		display: 'builtin'
+	});
+	native.setSnapshot({
+		status: 'working',
+		sessionId: 'sess-long',
+		sessionTitle: 'Very Long Complex Project Workflow With Deeply Nested Repository Paths And Symbols That Need Truncation Tail',
+		availableSessions: [
+			{ sessionId: 'sess-long', title: 'Very Long Complex Project Workflow With Deeply Nested Repository Paths And Symbols That Need Truncation Tail', isCurrent: true, startedAt: 1000 },
+			{ sessionId: 'sess-other', title: 'Second Session', isCurrent: false, startedAt: 2000 },
+		],
+		revision: 204,
+		connected: true,
+		prebaseForeground: true,
+		isInProgress: true,
+		activityLabel: 'Compiling PreBase core subsystems with incremental watch enabled',
+		recentActions: [],
+		startedAt: Date.now() - 4000,
+		userDismissedAttention: false,
+	});
+
+	native.simulateAction('click');
+	await new Promise(r => setTimeout(r, 120));
+
+	const diag = native.getDiagnostics();
+	assert.strictEqual(diag.sessionButtonVisible, true, 'sessionButton must be visible');
+
+	const snapshotPath = join(repoRoot, '.evidence/native-notch/M_long_title_session_button.png');
+	const buf = native.capturePanelSnapshot(snapshotPath);
+	assert.ok(buf && buf.length > 500, 'Captured PNG for long title session button');
+
+	native.dispose();
+});
+
+test('Magnus Notch: Visual verification of conversation projection with role hierarchy', { skip: !hasNative }, async () => {
+	const native = require(addonPath);
+
+	native.setPresentation({
+		visible: true,
+		pinned: true,
+		reducedMotion: true,
+		display: 'builtin'
+	});
+	native.setSnapshot({
+		status: 'working',
+		sessionId: 'sess-chat',
+		sessionTitle: 'Fix graph layout',
+		availableSessions: [
+			{ sessionId: 'sess-chat', title: 'Fix graph layout', isCurrent: true, startedAt: 1000 },
+		],
+		conversationTranscript: [
+			{ role: 'user', text: 'Can you analyze the memory leak in the temporal graph renderer?' },
+			{ role: 'agent', text: 'Found circular reference in node cache. Patched disposal listener and verified 0 leaks remaining.' },
+			{ role: 'user', text: 'Great, please verify with automated tests now.' },
+		],
+		revision: 205,
+		connected: true,
+		prebaseForeground: true,
+		isInProgress: true,
+		activityLabel: 'Running test:graphs-contracts suite',
+		recentActions: [],
+		startedAt: Date.now() - 5000,
+		userDismissedAttention: false,
+	});
+
+	native.simulateAction('click');
+	await new Promise(r => setTimeout(r, 120));
+
+	const diag = native.getDiagnostics();
+	assert.strictEqual(diag.conversationTranscriptCount, 3, 'Transcript count must be 3');
+
+	const snapshotPath = join(repoRoot, '.evidence/native-notch/N_conversation_projection.png');
+	const buf = native.capturePanelSnapshot(snapshotPath);
+	assert.ok(buf && buf.length > 500, 'Captured PNG for conversation projection');
+
+	native.dispose();
+});
+
+test('Magnus Notch: Visual verification of adversarial text containment', { skip: !hasNative }, async () => {
+	const native = require(addonPath);
+
+	native.setPresentation({
+		visible: true,
+		pinned: true,
+		reducedMotion: true,
+		display: 'builtin'
+	});
+	native.setSnapshot({
+		status: 'working',
+		sessionId: 'sess-containment',
+		sessionTitle: 'Containment Audit',
+		availableSessions: [
+			{ sessionId: 'sess-containment', title: 'Containment Audit', isCurrent: true, startedAt: 1000 },
+		],
+		// Normal words up to 28 chars ('internationalization') + long path + commit hash + unbroken run
+		activityLabel: 'Checking internationalization in /Users/qunyingfan/Prebasecode/src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts at commit 4f8b91c2d3e4f5a6b7c8d9e01234567890abcdef',
+		conversationTranscript: [
+			{ role: 'user', text: 'Process incomprehensibilities and https://github.com/microsoft/vscode/commit/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' },
+			{ role: 'agent', text: 'Verified 500-char run: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa safely contained.' },
+		],
+		revision: 206,
+		connected: true,
+		prebaseForeground: true,
+		isInProgress: true,
+		recentActions: [],
+		startedAt: Date.now() - 6000,
+		userDismissedAttention: false,
+	});
+
+	native.simulateAction('click');
+	await new Promise(r => setTimeout(r, 120));
+
+	const snapshotPath = join(repoRoot, '.evidence/native-notch/O_text_containment_torture.png');
+	const buf = native.capturePanelSnapshot(snapshotPath);
+	assert.ok(buf && buf.length > 500, 'Captured PNG for adversarial text containment');
+
+	native.dispose();
+});
+
+

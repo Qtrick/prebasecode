@@ -39,6 +39,7 @@ import { CommandsRegistry, ICommandService } from '../../../../../platform/comma
 import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import product from '../../../../../platform/product/common/product.js';
+import { isAgentsWindowEnabled } from '../../common/agentsWindowCapability.js';
 
 export class OpenWorkspaceInAgentsWindowAction extends Action2 {
 	constructor() {
@@ -67,6 +68,9 @@ export class OpenWorkspaceInAgentsWindowAction extends Action2 {
 
 	async run(accessor: ServicesAccessor) {
 		if (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
+			return;
+		}
+		if (!isAgentsWindowEnabled(product)) {
 			return;
 		}
 		const nativeHostService = accessor.get(INativeHostService);
@@ -114,6 +118,9 @@ export class OpenAgentsWindowAction extends Action2 {
 		if (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
 			return;
 		}
+		if (!isAgentsWindowEnabled(product)) {
+			return;
+		}
 		const nativeHostService = accessor.get(INativeHostService);
 		await nativeHostService.openAgentsWindow(args);
 	}
@@ -152,6 +159,9 @@ export class OpenChatSessionInAgentsWindowAction extends Action2 {
 
 	async run(accessor: ServicesAccessor, ...rest: unknown[]): Promise<void> {
 		if (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW']) {
+			return;
+		}
+		if (!isAgentsWindowEnabled(product)) {
 			return;
 		}
 		const chatWidgetService = accessor.get(IChatWidgetService);
@@ -230,7 +240,7 @@ export class OpenWorkspaceInAgentsContribution extends Disposable implements IWo
 		@IProductService productService: IProductService,
 	) {
 		super();
-		const enabled = (productService.prebaseAgentsWindowEnabled ?? false) || Boolean(process.env['PREBASE_ENABLE_AGENTS_WINDOW']);
+		const enabled = isAgentsWindowEnabled(productService) && ((productService.prebaseAgentsWindowEnabled ?? false) || Boolean(process.env['PREBASE_ENABLE_AGENTS_WINDOW']));
 		CONTEXT_AGENTS_WINDOW_ENABLED.bindTo(contextKeyService).set(enabled);
 		if (!enabled) {
 			return;
@@ -383,6 +393,15 @@ export class AgentsHandoffInputTipContribution extends Disposable implements IWo
 	}
 
 	private _update(): void {
+		// Fail-closed dormancy: when Agents Window is not enabled, immediately tear down any notification and return.
+		if (!isAgentsWindowEnabled(product) || (product.prebaseAgentsWindowEnabled === false && !process.env['PREBASE_ENABLE_AGENTS_WINDOW'])) {
+			if (this._lastPostedFor) {
+				this._notificationService.deleteNotification(AgentsHandoffInputTipContribution.NOTIFICATION_ID);
+				this._lastPostedFor = undefined;
+			}
+			return;
+		}
+
 		const mode = this._getMode();
 
 		// Suppress the tip entirely when the mode hides it, or once the user has

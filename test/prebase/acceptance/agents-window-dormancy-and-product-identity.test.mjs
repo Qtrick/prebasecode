@@ -6,6 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -84,7 +85,7 @@ test('Quick messaging & session integrity: followUp validates session identity b
 	const getSessionIdx = sessionTs.indexOf('const model = deps.chatService.getSession(sessionResource);');
 	const sessionCheckIdx = sessionTs.indexOf('command failed closed: session mismatch');
 	const followUpIdx = sessionTs.indexOf("if (command.kind === 'followUp')");
-	const sendRequestIdx = sessionTs.indexOf('deps.chatService.sendRequest(sessionResource, text)');
+	const sendRequestIdx = sessionTs.indexOf('deps.chatService.sendRequest(sessionResource, text');
 
 	assert.ok(getSessionIdx > 0, 'getSession must be called');
 	assert.ok(sessionCheckIdx > getSessionIdx, 'session mismatch check must occur after getSession');
@@ -108,12 +109,50 @@ test('Agents Window Dormancy: chatAccessibilityHelp suppresses agent window acti
 	assert.match(helpTs, /if \(isAgentsWindowEnabled\)\s*\{[\s\S]*focusAgentSessionsViewer[\s\S]*openAgentsWindow[\s\S]*openAgentHostFolderPicker/, 'agent window announcements must be enclosed in isAgentsWindowEnabled check');
 });
 
-test('Notch session management: live_activity.mm provides native session switcher and new session action', () => {
-	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
-	assert.match(mm, /@property\s*\(nonatomic,\s*strong\)\s*NSButton\s*\*sessionButton;/, 'NSButton sessionButton must exist in native panel');
-	assert.match(mm, /simulateSelectSession:/, 'simulateSelectSession: must be exported for testability');
-	assert.match(mm, /simulateCreateSession/, 'simulateCreateSession must be exported for testability');
-	assert.match(mm, /\[self\s+emit:@"selectSession"/, 'native panel must emit selectSession action');
-	assert.match(mm, /\[self\s+emit:@"createSession"/, 'native panel must emit createSession action');
+test('Agents Window Dormancy: Centralized isAgentsWindowEnabled capability behavior', () => {
+	const capabilityTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/chat/common/agentsWindowCapability.ts'), 'utf8');
+	assert.match(capabilityTs, /export function isAgentsWindowEnabled\(/, 'isAgentsWindowEnabled function must be exported');
+
+	// Run behavior test via strip-types child
+	const script = `
+import assert from 'node:assert/strict';
+import { isAgentsWindowEnabled } from ${JSON.stringify(join(repoRoot, 'src/vs/workbench/contrib/chat/common/agentsWindowCapability.ts'))};
+
+// Default product config (dormant)
+assert.strictEqual(isAgentsWindowEnabled({ prebaseAgentsWindowEnabled: false }, {}), false, 'Default dormant config must return false');
+assert.strictEqual(isAgentsWindowEnabled({}, {}), false, 'Empty config with no env must return false');
+assert.strictEqual(isAgentsWindowEnabled(undefined, {}), false, 'Undefined config must return false');
+
+// Internal override enabled
+assert.strictEqual(isAgentsWindowEnabled({ prebaseAgentsWindowEnabled: false }, { PREBASE_ENABLE_AGENTS_WINDOW: '1' }), true, 'Env override must enable capability');
+assert.strictEqual(isAgentsWindowEnabled({ prebaseAgentsWindowEnabled: true }, {}), true, 'Product config true must enable capability');
+`;
+	const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+		cwd: repoRoot,
+		encoding: 'utf8',
+	});
+	assert.strictEqual(child.status, 0, child.stderr || child.stdout);
 });
+
+test('Agents Window Dormancy: Tips and handoff messaging completely suppressed', () => {
+	const actionsTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/chat/electron-browser/agentSessions/agentSessionsActions.ts'), 'utf8');
+	assert.match(actionsTs, /AgentsHandoffInputTipContribution[\s\S]*if\s*\(!isAgentsWindowEnabled\(product\)/, 'AgentsHandoffInputTipContribution must gate on isAgentsWindowEnabled');
+	assert.match(actionsTs, /this\._notificationService\.deleteNotification\(AgentsHandoffInputTipContribution\.NOTIFICATION_ID\);/, 'Dormant state must delete any lingering notification');
+
+	const chatTipTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/chat/browser/chatTipService.ts'), 'utf8');
+	assert.match(chatTipTs, /isAgentsWindowEnabled\(this\._productService\)/, 'ChatTipService must check isAgentsWindowEnabled');
+});
+
+test('Agents Window Dormancy: NativeHostMainService suppresses openAgentsWindow', () => {
+	const nativeHostTs = readFileSync(join(repoRoot, 'src/vs/platform/native/electron-main/nativeHostMainService.ts'), 'utf8');
+	assert.match(nativeHostTs, /openAgentsWindow\(windowId: number \| undefined[\s\S]*if \(this\.productService\.prebaseAgentsWindowEnabled === false && !process\.env\['PREBASE_ENABLE_AGENTS_WINDOW'\]\)\s*\{\s*this\.logService\.info\('nativeHost#openAgentsWindow suppressed: Agents window is dormant'\);/,
+		'nativeHostMainService must suppress openAgentsWindow when dormant');
+});
+
+test('Product identity: Runtime Preview terminal uses canonical PreBase Server name', () => {
+	const runtimeServiceTs = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseRuntimeService.ts'), 'utf8');
+	assert.doesNotMatch(runtimeServiceTs, /"PreBase Dev Server"/, 'prebaseRuntimeService must not name terminal "PreBase Dev Server"');
+	assert.match(runtimeServiceTs, /"PreBase Server"/, 'prebaseRuntimeService must name terminal "PreBase Server"');
+});
+
 

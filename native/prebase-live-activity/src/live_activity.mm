@@ -173,10 +173,14 @@ static NSString *SanitizeTextForContainment(NSString *text) {
 	if (!text.length) {
 		return @"";
 	}
-	NSArray *words = [text componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+	NSCharacterSet *delimSet = [NSCharacterSet characterSetWithCharactersInString:@"/\\_?&=@#-:"];
+	NSCharacterSet *wsSet = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+	NSCharacterSet *letterSet = [NSCharacterSet letterCharacterSet];
+
+	NSArray *words = [text componentsSeparatedByCharactersInSet:wsSet];
 	BOOL needsSanitization = NO;
 	for (NSString *word in words) {
-		if (word.length > 18 || [word rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"/\\_?&=@#"]].location != NSNotFound) {
+		if (word.length > 24 || [word rangeOfCharacterFromSet:delimSet].location != NSNotFound) {
 			needsSanitization = YES;
 			break;
 		}
@@ -185,27 +189,42 @@ static NSString *SanitizeTextForContainment(NSString *text) {
 		return text;
 	}
 
-	NSMutableString *result = [NSMutableString stringWithCapacity:text.length + 16];
+	NSMutableString *result = [NSMutableString stringWithCapacity:text.length + 32];
 	NSInteger runLength = 0;
+	BOOL isPureLetters = YES;
 	NSUInteger len = text.length;
 	unichar zeroWidthSpace = 0x200B;
 
 	for (NSUInteger i = 0; i < len; i++) {
 		unichar ch = [text characterAtIndex:i];
 		[result appendFormat:@"%C", ch];
-		if ([[NSCharacterSet whitespaceAndNewlineCharacterSet] characterIsMember:ch]) {
+		if ([wsSet characterIsMember:ch]) {
 			runLength = 0;
+			isPureLetters = YES;
 			continue;
 		}
 		runLength++;
-		// Break opportunity after URL/path separators in non-trivial words
-		if ((ch == '/' || ch == '\\' || ch == '?' || ch == '&' || ch == '=' || ch == '_' || ch == '-') && runLength >= 8) {
+		if (![letterSet characterIsMember:ch]) {
+			isPureLetters = NO;
+		}
+		// Break opportunity after URL/path separators in non-trivial segments
+		if ((ch == '/' || ch == '\\' || ch == '?' || ch == '&' || ch == '=' || ch == '_' || ch == '-' || ch == '#' || ch == ':') && runLength >= 8) {
 			[result appendFormat:@"%C", zeroWidthSpace];
 			runLength = 0;
-		} else if (runLength >= 16) {
-			// Continuous unbroken run exceeding 16 chars
-			[result appendFormat:@"%C", zeroWidthSpace];
-			runLength = 0;
+			isPureLetters = YES;
+		} else if (isPureLetters) {
+			// Ordinary dictionary words should not be broken aggressively; allow up to 28 characters before forced break
+			if (runLength >= 28) {
+				[result appendFormat:@"%C", zeroWidthSpace];
+				runLength = 0;
+			}
+		} else {
+			// Mixed alphanumeric runs (hashes, base64, minified code, tokens): break at 24 chars
+			if (runLength >= 24) {
+				[result appendFormat:@"%C", zeroWidthSpace];
+				runLength = 0;
+				isPureLetters = YES;
+			}
 		}
 	}
 	return result;
@@ -1064,6 +1083,39 @@ static NSString *JSString(Napi::Value value) {
 	return [self placeContentBlock:field text:text lines:lines indent:indent contentW:contentW y:y contentMaxY:contentMaxY allowOverflow:NO];
 }
 
+- (BOOL)placeAttributedBlock:(NSTextField *)field attributedString:(NSAttributedString *)attrString plainText:(NSString *)plainText lines:(NSInteger)lines indent:(CGFloat)indent contentW:(CGFloat)contentW y:(CGFloat *)y contentMaxY:(CGFloat)contentMaxY allowOverflow:(BOOL)allowOverflow {
+	if (!field || !attrString.length) {
+		return YES;
+	}
+	CGFloat avail = contentMaxY - *y;
+	if (!allowOverflow && avail < 12) {
+		return NO;
+	}
+	CGFloat fieldW = MAX(24, contentW - indent);
+	NSFont *measureFont = field.font ?: [NSFont systemFontOfSize:11.0];
+	CGFloat lineH = ceil(measureFont.ascender - measureFont.descender + measureFont.leading);
+	if (lineH < 12) {
+		lineH = measureFont.pointSize + 4;
+	}
+	NSRect bounds = [attrString boundingRectWithSize:NSMakeSize(fieldW, lineH * lines + 6)
+		options:(NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading)];
+	CGFloat need = ceil(NSHeight(bounds)) + (lines > 1 ? 2 : 0);
+	need = MIN(lineH * lines + 4, MAX(lineH, need));
+	if (need < 11) {
+		return NO;
+	}
+	if (!allowOverflow && need > avail) {
+		return NO;
+	}
+	[self configureLabel:field lines:lines truncating:!allowOverflow];
+	field.attributedStringValue = attrString;
+	field.hidden = NO;
+	CGFloat insetX = ContentSafeInsetX(self.notched, self.cachedEffShoulderR, YES);
+	field.frame = NSMakeRect(insetX + indent, *y, fieldW, need);
+	*y += need + kContentGap;
+	return YES;
+}
+
 /** Reconcile action rows by stable id — update labels in place, never reshuffle existing rows. */
 - (void)reconcileActionRowsIntoDocument:(CGFloat *)docY contentW:(CGFloat)docContentW ok:(BOOL *)ok {
 	if (!ok || !*ok) {
@@ -1370,11 +1422,18 @@ static NSString *JSString(Napi::Value value) {
 			NSString *sessionName = self.controller.sessionTitle.length ? self.controller.sessionTitle : @"Magnus";
 			NSString *buttonTitle = [NSString stringWithFormat:@"%@ ▾", sessionName];
 			self.controller.sessionButton.title = buttonTitle;
+			NSMutableParagraphStyle *btnStyle = [[NSMutableParagraphStyle alloc] init];
+			btnStyle.lineBreakMode = NSLineBreakByTruncatingTail;
+			btnStyle.alignment = NSTextAlignmentLeft;
 			NSDictionary *attrs = @{
 				NSFontAttributeName: [NSFont systemFontOfSize:11.5 weight:NSFontWeightSemibold],
-				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.96 alpha:1.0]
+				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.96 alpha:1.0],
+				NSParagraphStyleAttributeName: btnStyle
 			};
+			self.controller.sessionButton.cell.lineBreakMode = NSLineBreakByTruncatingTail;
 			self.controller.sessionButton.attributedTitle = [[NSAttributedString alloc] initWithString:buttonTitle attributes:attrs];
+			self.controller.sessionButton.toolTip = sessionName;
+			self.controller.sessionButton.accessibilityLabel = [NSString stringWithFormat:@"Current session: %@", sessionName];
 			CGFloat measuredW = [buttonTitle sizeWithAttributes:attrs].width + 16;
 			CGFloat sessionW = MIN(titleW, MAX(60, measuredW));
 			self.controller.sessionButton.frame = NSMakeRect(headerInset, y - 2, sessionW, kHeaderRowHeight + 4);
@@ -1428,7 +1487,7 @@ static NSString *JSString(Napi::Value value) {
 	if (!hasPending) {
 		if (self.conversationTranscript.count > 0) {
 			NSInteger tIdx = 0;
-			NSInteger startTurn = (NSInteger)self.conversationTranscript.count > 4 ? (NSInteger)self.conversationTranscript.count - 4 : 0;
+			NSInteger startTurn = (NSInteger)self.conversationTranscript.count > 3 ? (NSInteger)self.conversationTranscript.count - 3 : 0;
 			for (NSInteger i = startTurn; i < (NSInteger)self.conversationTranscript.count && tIdx < (NSInteger)self.transcriptLabels.count; i++) {
 				NSDictionary *turn = self.conversationTranscript[i];
 				NSString *role = turn[@"role"] ?: @"agent";
@@ -1438,13 +1497,34 @@ static NSString *JSString(Napi::Value value) {
 				}
 				NSTextField *tField = self.transcriptLabels[tIdx++];
 				BOOL isUser = [role isEqualToString:@"user"];
-				NSString *prefix = isUser ? @"You: " : @"Magnus: ";
-				NSString *fullText = [prefix stringByAppendingString:tText];
-				tField.font = [NSFont systemFontOfSize:11.0 weight:isUser ? NSFontWeightMedium : NSFontWeightRegular];
-				tField.textColor = isUser
-					? [NSColor colorWithCalibratedWhite:0.72 alpha:1.0]
-					: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0];
-				[self placeContentBlock:tField text:fullText lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
+				NSString *cleanText = SanitizeTextForContainment(tText);
+
+				NSMutableAttributedString *attrTurn = [[NSMutableAttributedString alloc] init];
+				NSString *badgeStr = isUser ? @"YOU" : @"MAGNUS";
+				NSColor *badgeColor = isUser
+					? [NSColor colorWithCalibratedWhite:0.55 alpha:1.0]
+					: [NSColor colorWithCalibratedRed:0.35 green:0.78 blue:0.98 alpha:0.95];
+				NSDictionary *badgeAttrs = @{
+					NSFontAttributeName: [NSFont systemFontOfSize:8.5 weight:NSFontWeightBold],
+					NSForegroundColorAttributeName: badgeColor,
+				};
+				[attrTurn appendAttributedString:[[NSAttributedString alloc] initWithString:badgeStr attributes:badgeAttrs]];
+				[attrTurn appendAttributedString:[[NSAttributedString alloc] initWithString:@"  " attributes:badgeAttrs]];
+
+				NSColor *bodyColor = isUser
+					? [NSColor colorWithCalibratedWhite:0.75 alpha:1.0]
+					: [NSColor colorWithCalibratedWhite:0.94 alpha:1.0];
+				NSMutableParagraphStyle *turnStyle = [[NSMutableParagraphStyle alloc] init];
+				turnStyle.lineBreakMode = NSLineBreakByWordWrapping;
+				turnStyle.lineSpacing = 1.5;
+				NSDictionary *bodyAttrs = @{
+					NSFontAttributeName: [NSFont systemFontOfSize:11.0 weight:isUser ? NSFontWeightRegular : NSFontWeightMedium],
+					NSForegroundColorAttributeName: bodyColor,
+					NSParagraphStyleAttributeName: turnStyle,
+				};
+				[attrTurn appendAttributedString:[[NSAttributedString alloc] initWithString:cleanText attributes:bodyAttrs]];
+
+				[self placeAttributedBlock:tField attributedString:attrTurn plainText:cleanText lines:(isUser ? 2 : 3) indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
 			}
 		}
 		NSString *displayActivity = ResolveHumanReadableActivity(self.activityLabel, self.latestMessage);

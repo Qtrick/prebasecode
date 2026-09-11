@@ -878,7 +878,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 
 			const instance = await this.terminalService.createTerminal({
 				config: {
-					name: localize('prebase.runtime.terminalName', "PreBase Dev Server"),
+					name: localize('prebase.runtime.terminalName', "PreBase Server"),
 					cwd,
 				},
 				cwd
@@ -1315,7 +1315,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		}
 		const cwd = this._workspaceFolderUri ?? this.workspaceService.getWorkspace().folders[0]?.uri;
 		const instance = await this.terminalService.createTerminal({
-			config: { name: localize('prebase.runtime.terminalName', "PreBase Dev Server"), cwd },
+			config: { name: localize('prebase.runtime.terminalName', "PreBase Server"), cwd },
 			cwd,
 		});
 		this._devTerminal = instance;
