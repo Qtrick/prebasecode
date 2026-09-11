@@ -125,3 +125,172 @@ test('Product Naming: LanguageModelProvider uses PreBase instead of Agents for u
 	assert.doesNotMatch(providerTs, /Agents has no configured AI provider/,
 		'languageModelProvider must not refer to product as "Agents"');
 });
+
+// 4. Dead Code Removal — layout solver and duplicate metrics
+test('Architecture: SolveInteractiveLayout and ComputeSilhouetteMetrics removed (dead code eliminated)', () => {
+	const layoutH = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity_layout.h'), 'utf8');
+
+	// SolveInteractiveLayout must NOT exist — it was dead code never called by production
+	assert.doesNotMatch(layoutH, /SolveInteractiveLayout/,
+		'SolveInteractiveLayout must be removed (was dead code, never called by live_activity.mm)');
+	assert.doesNotMatch(layoutH, /ResolvedInteractiveLayout/,
+		'ResolvedInteractiveLayout struct must be removed (was dead code)');
+	assert.doesNotMatch(layoutH, /ComputeSilhouetteMetrics/,
+		'ComputeSilhouetteMetrics must be removed (was dead code, never called by live_activity.mm)');
+
+	// Header must still contain the essential geometry helpers
+	assert.match(layoutH, /ComputeRightShoulderBezier/,
+		'Header must retain ComputeRightShoulderBezier (used by production)');
+	assert.match(layoutH, /ComputeLeftShoulderBezier/,
+		'Header must retain ComputeLeftShoulderBezier (used by production)');
+	assert.match(layoutH, /LayoutTokens/,
+		'Header must retain LayoutTokens (shared constant definitions)');
+});
+
+test('Architecture: Single authoritative shoulder metrics — no duplicate ComputeSilhouetteMetrics', () => {
+	const layoutH = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity_layout.h'), 'utf8');
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// Header must NOT define ComputeSilhouetteMetrics
+	assert.doesNotMatch(layoutH, /ComputeSilhouetteMetrics/,
+		'Header must not define ComputeSilhouetteMetrics (production uses ComputeSilhouetteShoulderMetrics)');
+
+	// Production code must define ComputeSilhouetteShoulderMetrics as the single authority
+	assert.match(mm, /static\s+SilhouetteShoulderMetrics\s+ComputeSilhouetteShoulderMetrics/,
+		'live_activity.mm must define ComputeSilhouetteShoulderMetrics as single authority');
+
+	// Production must NOT call any header-defined metrics function
+	assert.doesNotMatch(mm, /ComputeSilhouetteMetrics\s*\(/,
+		'live_activity.mm must not call header ComputeSilhouetteMetrics');
+});
+
+// 5. Layout Geometry Invariants
+test('Layout Invariants: scroll viewport must not overlap footer controls', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// refreshContentSubviewsPreservingPresentation must compute footerReserve from live control stack
+	assert.match(mm, /CGFloat\s+measuredFooter\s*=\s*self\.controller\s*\n\s*\?\s*\[self\.controller\s+computeControlsStackHeight\]\s*\+\s*kContentFooterGutter/,
+		'measuredFooter must be computed from live computeControlsStackHeight + gutter');
+
+	// footerReserve must be MAX of reserved and measured
+	assert.match(mm, /CGFloat\s+footerReserve\s*=\s*MAX\(self\.reservedFooterHeight,\s*measuredFooter\);/,
+		'footerReserve must be MAX of reservedFooterHeight and measuredFooter');
+
+	// Available scroll must subtract footerReserve + gutter from bodyHeight
+	assert.match(mm, /CGFloat\s+availableScroll\s*=\s*bodyHeight\s*-\s*footerReserve\s*-\s*scrollTop;/,
+		'Available scroll must be bodyHeight minus footerReserve minus scrollTop');
+});
+
+test('Layout Invariants: header row and status badge must not collide', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// Status badge width must be bounded to 40% of header width
+	assert.match(mm, /CGFloat\s+statusW\s*=\s*MIN\(headerW\s*\*\s*0\.40,/,
+		'Status badge width must be bounded to 40% of header width');
+
+	// Title width must be headerW minus statusW minus gap
+	assert.match(mm, /CGFloat\s+titleW\s*=\s*MAX\(48,\s*headerW\s*-\s*statusW\s*-\s*8\);/,
+		'Title width must leave room for status badge (8pt gap)');
+
+	// Status badge must be right-aligned
+	assert.match(mm, /NSMakeRect\(totalW\s*-\s*headerInset\s*-\s*statusW,\s*y,\s*statusW,\s*kHeaderRowHeight\)/,
+		'Status badge must be positioned at trailing edge');
+});
+
+test('Layout Invariants: expanded content uses canonical presentation state for geometry', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// computeTargetContentHeight must use canonicalTargetPresentationState
+	assert.match(mm, /PrebasePresentationState\s+state\s*=\s*\[self\s+canonicalTargetPresentationState\];[\s\S]*computeTargetContentHeight/,
+		'computeTargetContentHeight must use canonicalTargetPresentationState');
+
+	// geometrySignatureForBandH must incorporate semantic state, not raw text
+	assert.match(mm, /geometrySignatureForBandH[\s\S]*expanded\s*\?\s*1\s*:\s*0/,
+		'Geometry signature must incorporate expanded state');
+	assert.match(mm, /geometrySignatureForBandH[\s\S]*status,/,
+		'Geometry signature must incorporate status');
+	assert.match(mm, /geometrySignatureForBandH[\s\S]*kind=/,
+		'Geometry signature must incorporate pending kind');
+});
+
+test('Layout Invariants: content footer gutter prevents scroll content bleeding under controls', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// kContentFooterGutter must be defined
+	assert.match(mm, /static\s+const\s+CGFloat\s+kContentFooterGutter\s*=\s*8;/,
+		'kContentFooterGutter must be 8pt');
+
+	// Footer reserve must include the gutter
+	assert.match(mm, /h\s*\+=\s*\[self\s+computeControlsStackHeight\];[\s\S]*h\s*\+=\s*kContentFooterGutter;/,
+		'computeTargetContentHeight must add kContentFooterGutter after footer controls');
+});
+
+// 6. Presentation State Machine
+test('Presentation State: canonical state resolution is deterministic', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// Must define all presentation states
+	const states = ['Hidden', 'Compact', 'AttentionCompact', 'Peek', 'AttentionPeek',
+		'InteractiveWorking', 'InteractiveQuestion', 'InteractiveApproval',
+		'TerminalCompleted', 'TerminalFailed'];
+	for (const state of states) {
+		assert.match(mm, new RegExp(`PrebasePresentationState${state}`),
+			`Must define PrebasePresentationState${state}`);
+	}
+
+	// canonicalPresentationState must check visible first
+	assert.match(mm, /canonicalPresentationState[\s\S]*if\s*\(!self\.visible\)\s*\{\s*return\s+PrebasePresentationStateHidden/,
+		'canonicalPresentationState must return Hidden when not visible');
+
+	// Must have canonicalTargetPresentationState (separate from canonicalPresentationState)
+	assert.match(mm, /- \(PrebasePresentationState\)canonicalTargetPresentationState/,
+		'Must have separate canonicalTargetPresentationState');
+});
+
+// 7. Action In-flight Duplicate Prevention
+test('Action In-Flight: duplicate submission blocked while action is in flight', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// approve: must check actionInFlight
+	assert.match(mm, /- \(void\)approve:\(id\)sender\s*\{[\s\S]*if\s*\(self\.actionInFlight\)\s*\{\s*return;\s*\}/,
+		'approve must check actionInFlight before proceeding');
+
+	// deny: must check actionInFlight
+	assert.match(mm, /- \(void\)deny:\(id\)sender\s*\{[\s\S]*if\s*\(self\.actionInFlight\)\s*\{\s*return;\s*\}/,
+		'deny must check actionInFlight before proceeding');
+
+	// answerOption: must check actionInFlight
+	assert.match(mm, /- \(void\)answerOption:\(id\)sender[\s\S]*if\s*\(self\.actionInFlight\)\s*\{\s*return;\s*\}/,
+		'answerOption must check actionInFlight before proceeding');
+
+	// beginActionInFlight must disable controls
+	assert.match(mm, /beginActionInFlight[\s\S]*self\.approveButton\.enabled\s*=\s*NO/,
+		'beginActionInFlight must disable approveButton');
+	assert.match(mm, /beginActionInFlight[\s\S]*self\.denyButton\.enabled\s*=\s*NO/,
+		'beginActionInFlight must disable denyButton');
+
+	// In-flight timeout must exist
+	assert.match(mm, /kActionInFlightTimeout\s*=\s*8\.0/,
+		'Action in-flight timeout must be 8 seconds');
+});
+
+// 8. Text Containment — SanitizeTextForContainment
+test('Text Containment: SanitizeTextForContainment handles pathological tokens', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// Must define SanitizeTextForContainment
+	assert.match(mm, /static\s+NSString\s+\*SanitizeTextForContainment\(NSString\s+\*text\)/,
+		'Must define SanitizeTextForContainment');
+
+	// Must insert zero-width break opportunities for pathological tokens
+	assert.match(mm, /unichar\s+zeroWidthSpace\s*=\s*0x200B;/,
+		'Must use U+200B zero-width space for break opportunities');
+
+	// Must break after URL/path separators (/, \, ?, &, =, _, -, #, :)
+	assert.match(mm, /ch\s*==\s*'[\/\\?&=_#:-]'/,
+		'Must break after URL/path separators');
+
+	// Must handle long runs of mixed alphanumeric at 24 chars
+	assert.match(mm, /runLength\s*>=\s*24/,
+		'Must break mixed alphanumeric runs at 24 chars');
+});
