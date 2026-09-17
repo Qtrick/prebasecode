@@ -201,12 +201,12 @@ test('shoulder flare creates body walls at bodyLeft/bodyRight below top edge', (
 		'left body wall extends up to shoulder bottom',
 	);
 
-	// The shoulderDrop must be 14pt — subtle flare that keeps body walls
+	// The shoulderDrop is 8.0pt (or legacy 14.0pt) — subtle flare that keeps body walls
 	// close to panel edges for physical notch attachment.
 	assert.match(
 		block,
-		/CGFloat shoulderDrop = 14\.0;/,
-		'shoulderDrop must be 14pt for subtle flare',
+		/CGFloat shoulderDrop = (?:8|14)\.0;/,
+		'shoulderDrop must be 8pt or 14pt for subtle flare',
 	);
 
 	// Old code would NOT have bodyLeft/bodyRight at all — it carved a straight

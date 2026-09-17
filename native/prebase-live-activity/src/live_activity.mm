@@ -48,7 +48,7 @@ static const CGFloat kButtonCornerRadius = 10; // Rounded controls (buttons, ico
 static const CGFloat kExpandedHeightMax = 220;
 static const CGFloat kExpandedHeightMin = 72;
 /** Width pad constants for semantic state buckets (COMPACT / STANDARD / WIDE). */
-static const CGFloat kExpandedWidthPad __attribute__((used)) = 28;       // legacy alias — kept for static contract
+static const CGFloat kExpandedWidthPad = 28;       // legacy alias — kept for static contract
 static const CGFloat kExpandedWidthStandardPad = 36; // working, terminal
 static const CGFloat kExpandedWidthWidePad = 84;    // approval, question
 /** Minimum usable scroll viewport in working interactive state (pt). */
@@ -67,7 +67,9 @@ static NSDictionary *RectDict(NSRect r) {
 	};
 }
 
-// Vertically-centered NSTextFieldCell — fixes the "text too high" visual defect in the composer.
+// Centered NSTextFieldCell with horizontal padding — fixes text colliding with curved borders.
+static const CGFloat kTextFieldHorizontalPadding = 10.0;
+
 @interface PrebaseCenteredTextFieldCell : NSTextFieldCell
 @end
 
@@ -80,12 +82,18 @@ static NSDictionary *RectDict(NSRect r) {
 		textHeight = MAX(textHeight, ceil(placeholder.size.height));
 	}
 	CGFloat yOffset = floor((NSHeight(frame) - textHeight) / 2.0);
-	return NSMakeRect(NSMinX(frame), NSMinY(frame) + yOffset, NSWidth(frame), textHeight);
+	CGFloat xPad = kTextFieldHorizontalPadding;
+	CGFloat width = MAX(0.0, NSWidth(frame) - xPad * 2.0);
+	return NSMakeRect(NSMinX(frame) + xPad, NSMinY(frame) + yOffset, width, textHeight);
 }
 
 - (NSRect)drawingRectForBounds:(NSRect)proposedRect {
 	NSRect baseRect = [super drawingRectForBounds:proposedRect];
 	return [self adjustedFrameToVerticallyCenterText:baseRect];
+}
+
+- (NSRect)titleRectForBounds:(NSRect)theRect {
+	return [self drawingRectForBounds:theRect];
 }
 
 - (void)editWithFrame:(NSRect)rect inView:(NSView *)controlView editor:(NSText *)textObj delegate:(id)anObject event:(NSEvent *)theEvent {
@@ -768,6 +776,9 @@ static NSString *JSString(Napi::Value value) {
 }
 - (BOOL)canBecomeMainWindow {
 	return NO;
+}
+- (BOOL)needsPanelToBecomeKey {
+	return YES;
 }
 @end
 
@@ -2434,12 +2445,13 @@ static NSString *JSString(Napi::Value value) {
 	if (st < PrebasePresentationStateInteractiveWorking || st > PrebasePresentationStateInteractiveApproval) {
 		return 0;
 	}
-	// Must match layoutControls: bottomY = bodyH - kControlHeight - effBottomR - 5.
+	// Must match layoutControls: bottomY = bodyH - kControlHeight - bottomMargin.
 	// The scroll viewport must end above the TOP of the first control row, not below the
 	// corner radius. So this returns the height from the first control row to body bottom
-	// (including effBottomR + 5 which is the gap below the last row).
+	// (including bottomMargin which is the gap below the last row).
+	const CGFloat bottomMargin = 12.0;
 	if (st == PrebasePresentationStateInteractiveApproval) {
-		return kControlHeight + 8.0;
+		return kControlHeight + bottomMargin;
 	}
 	BOOL hasOptions = (st == PrebasePresentationStateInteractiveQuestion && self.pendingOptions.count > 0);
 	if (hasOptions) {
@@ -2450,9 +2462,9 @@ static NSString *JSString(Napi::Value value) {
 		if (totalOpts > 4) {
 			rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
 		}
-		return rows * kControlHeight + MAX(0, rows - 1) * 4 + 8.0;
+		return rows * kControlHeight + MAX(0, rows - 1) * 4 + bottomMargin;
 	}
-	return kControlHeight + 8.0;
+	return kControlHeight + bottomMargin;
 }
 
 /** Geometry signature — incorporates semantic state (status, kind, interactionId, options, actions); raw character counts are excluded so streaming text never morphs geometry. */
@@ -2590,10 +2602,9 @@ static NSString *JSString(Napi::Value value) {
 		CGFloat minH = bandH + kContentInsetTop + kHeaderRowHeight + kContentGap + kContentMinScrollHeight + footerReserve;
 		h = MAX(h, minH);
 	}
-	// For approval state, cap to a comfortable height within the wider panel (WIDE bucket).
-	// With kExpandedWidthWidePad=84pt more width, content wraps shorter so we allow taller max.
+	// For approval state, cap comfortably without cutting off prompts or action buttons.
 	if ([self.pendingKind isEqualToString:@"approval"]) {
-		h = MIN(190.0, h);
+		h = MIN(kExpandedHeightMax, MAX(140.0, h));
 	}
 
 	CGFloat target = MIN(kExpandedHeightMax, MAX(kExpandedHeightMin, h));
@@ -2779,6 +2790,9 @@ static NSString *JSString(Napi::Value value) {
 				NSRect settled = self.panel ? self.panel.frame : win;
 				[self.content refreshContentSubviewsPreservingPresentation];
 				[self layoutControls:settled];
+				if (self.input && !self.input.isHidden && self.panel.isKeyWindow) {
+					[self.panel makeFirstResponder:self.input];
+				}
 			}
 		}];
 	}
@@ -2835,7 +2849,7 @@ static NSString *JSString(Napi::Value value) {
 	SilhouetteShoulderMetrics fShoulder = ComputeSilhouetteShoulderMetrics(NSWidth(win), bodyHeight, fLeftW, fRightW, fHousing, YES);
 	// For expanded state, body walls start at shoulderCurve from panel edges.
 	CGFloat footerInset = ContentSafeInsetX(self.content.notched, fShoulder.effShoulderR, YES);
-	CGFloat bottomMargin = 8.0;
+	CGFloat bottomMargin = 12.0;
 	CGFloat bottomY = bodyHeight - kControlHeight - bottomMargin;
 	CGFloat usableW = NSWidth(win) - footerInset * 2;
 
@@ -2985,6 +2999,9 @@ static NSString *JSString(Napi::Value value) {
 			self.openButton.hidden = YES;
 			self.input.hidden = NO;
 			self.input.frame = NSMakeRect(footerInset, bottomY, usableW, kControlHeight);
+			if (self.input && !self.input.isHidden && (self.panel.isKeyWindow || self.hovering || self.pinned)) {
+				[self.panel makeFirstResponder:self.input];
+			}
 			return;
 		}
 	}
@@ -3002,6 +3019,9 @@ static NSString *JSString(Napi::Value value) {
 	self.input.frame = NSMakeRect(footerInset, bottomY, composerW, kControlHeight);
 	self.pinButton.frame = NSMakeRect(footerInset + composerW + gap, bottomY + (kControlHeight - kIconControlSize) * 0.5, kIconControlSize, kIconControlSize);
 	self.openButton.frame = NSMakeRect(footerInset + composerW + gap + kIconControlSize + gap, bottomY + (kControlHeight - kIconControlSize) * 0.5, kIconControlSize, kIconControlSize);
+	if (self.input && !self.input.isHidden && (self.panel.isKeyWindow || self.hovering || self.pinned)) {
+		[self.panel makeFirstResponder:self.input];
+	}
 }
 
 - (void)performUserHaptic {
@@ -3416,8 +3436,7 @@ static NSString *JSString(Napi::Value value) {
 	newItem.target = self;
 	[menu addItem:newItem];
 
-	NSPoint loc = [self.sessionButton convertPoint:NSMakePoint(0, NSHeight(self.sessionButton.frame) + 4) toView:nil];
-	[menu popUpMenuPositioningItem:nil atLocation:loc inView:self.content.expandedContainer];
+	[menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, NSHeight(self.sessionButton.frame) + 4) inView:self.sessionButton];
 }
 
 - (void)selectSessionFromMenu:(NSMenuItem *)sender {

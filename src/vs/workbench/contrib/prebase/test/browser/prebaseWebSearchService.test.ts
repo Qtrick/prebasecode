@@ -190,7 +190,8 @@ suite('PreBase web search service', () => {
 		const encoded = `${JSON.stringify(headers)}\n${data}`;
 		assert.ok(!encoded.includes('FIRECRAWL'));
 		assert.ok(!encoded.includes('LINKUP'));
-		assert.ok(!encoded.includes('fc-'));
+		assert.ok(!data?.includes('fc-'));
+		assert.ok(!/fc-[a-zA-Z0-9_-]{10,}/.test(encoded));
 		assert.strictEqual(headers?.Authorization, 'Bearer session-token');
 		assert.ok(!Object.values(headers ?? {}).flatMap(value => Array.isArray(value) ? value : [value ?? '']).some(value => /linkup|firecrawl/i.test(value)));
 	});

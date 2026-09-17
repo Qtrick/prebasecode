@@ -8,6 +8,7 @@ import { createDecorator } from '../../../../platform/instantiation/common/insta
 import { asText, IRequestService } from '../../../../platform/request/common/request.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IPreBaseCloudService } from './cloud/prebaseCloudService.js';
+import { isRecord } from '../common/typeUtils.js';
 
 export const IPreBaseAgentGatewayService = createDecorator<IPreBaseAgentGatewayService>('prebaseAgentGatewayService');
 
@@ -15,10 +16,6 @@ export interface IPreBaseAgentGatewayService {
 	readonly _serviceBrand: undefined;
 	generate(payload: Record<string, unknown>, token: CancellationToken): Promise<Record<string, unknown>>;
 	discoverModels(token: CancellationToken): Promise<Array<{ id: string; displayName: string; description: string; inputTokenLimit: number; outputTokenLimit: number; agentCompatible: boolean; descriptionCompatible: boolean }>>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export class PreBaseAgentGatewayService implements IPreBaseAgentGatewayService {

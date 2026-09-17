@@ -8,6 +8,7 @@ import { createDecorator } from '../../../../platform/instantiation/common/insta
 import { asText, IRequestService } from '../../../../platform/request/common/request.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IPreBaseCloudService } from './cloud/prebaseCloudService.js';
+import { isRecord } from '../common/typeUtils.js';
 
 export interface IPreBaseWebSearchRequest {
 	query: string;
@@ -47,10 +48,6 @@ export interface IPreBaseWebSearchService {
 	readonly _serviceBrand: undefined;
 	searchForMagnus(input: IPreBaseWebSearchRequest, token: CancellationToken): Promise<IPreBaseWebSearchResponse>;
 	fetchForMagnus(input: IPreBaseWebFetchRequest, token: CancellationToken): Promise<IPreBaseWebSearchResponse>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function isPublicHttpUrl(value: string): boolean {

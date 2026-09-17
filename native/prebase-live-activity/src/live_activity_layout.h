@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Pure geometry helpers for Magnus Live Activity shoulder curves and layout tokens.
+ *  Pure geometry helpers for Magnus Live Activity shoulder curves.
  *--------------------------------------------------------------------------------------------*/
 
 #pragma once

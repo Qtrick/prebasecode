@@ -351,9 +351,71 @@ test('Shoulder Geometry: Single authoritative 6pt shoulder across native, calcul
 	// computeTargetContentHeight uses 6.0
 	assert.match(mm, /ContentSafeInsetX\(self\.content\.notched,\s*6\.0,\s*YES\)/,
 		'computeTargetContentHeight must use authoritative 6.0pt shoulder');
+});
 
-	// CreateNotchedIslandPath uses 8.0 drop and effShoulderR
-	assert.match(mm, /shoulderDrop\s*=\s*8\.0;/,
-		'Expanded shoulder drop must be 8.0pt');
+// 12. Composer Horizontal Inset & Title Rect
+test('Composer: PrebaseCenteredTextFieldCell applies horizontal inset padding and titleRectForBounds', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// Cell must define kTextFieldHorizontalPadding = 10.0
+	assert.match(mm, /kTextFieldHorizontalPadding\s*=\s*10\.0;/,
+		'Composer textfield cell must define 10pt horizontal padding');
+
+	// adjustedFrameToVerticallyCenterText must inset x by kTextFieldHorizontalPadding
+	assert.match(mm, /NSMakeRect\(NSMinX\(frame\)\s*\+\s*xPad,\s*NSMinY\(frame\)\s*\+\s*yOffset,\s*width,\s*textHeight\)/,
+		'adjustedFrameToVerticallyCenterText must inset text frame horizontally to clear curved borders');
+
+	// titleRectForBounds must be implemented to keep hit-testing and cell bounds aligned
+	assert.match(mm, /- \(NSRect\)titleRectForBounds:\(NSRect\)theRect\s*\{\s*return \[self drawingRectForBounds:theRect\];\s*\}/,
+		'titleRectForBounds must delegate to drawingRectForBounds');
+});
+
+// 13. Background Panel Activation & First Responder
+test('Panel Activation: PrebaseNotchPanel implements needsPanelToBecomeKey for background responsiveness', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// PrebaseNotchPanel must implement needsPanelToBecomeKey
+	assert.match(mm, /- \(BOOL\)needsPanelToBecomeKey\s*\{\s*return YES;\s*\}/,
+		'PrebaseNotchPanel must return YES for needsPanelToBecomeKey');
+
+	// layoutControls must restore first responder to input when visible on active panel
+	assert.match(mm, /if\s*\(self\.input\s*&&\s*!self\.input\.isHidden\s*&&\s*\(self\.panel\.isKeyWindow\s*\|\|\s*self\.hovering\s*\|\|\s*self\.pinned\)\)\s*\{\s*\[self\.panel makeFirstResponder:self\.input\];\s*\}/,
+		'layoutControls must focus input when unhidden on active/hovering/pinned panel');
+});
+
+// 14. Bottom Margin & Corner Radius Clearance
+test('Corner Clearance: Control stack and layoutControls maintain 12.0pt bottomMargin above corner curve', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// computeControlsStackHeight must use bottomMargin = 12.0
+	assert.match(mm, /computeControlsStackHeight[\s\S]*const\s+CGFloat\s+bottomMargin\s*=\s*12\.0;/,
+		'computeControlsStackHeight must use 12.0pt bottomMargin');
+
+	// layoutControls must use bottomMargin = 12.0
+	assert.match(mm, /layoutControls:[\s\S]*CGFloat\s+bottomMargin\s*=\s*12\.0;/,
+		'layoutControls must use 12.0pt bottomMargin to clear 18.0pt corner curve');
+
+	// computeTargetContentHeight approval state must allow up to kExpandedHeightMax
+	assert.match(mm, /\[self\.pendingKind\s+isEqualToString:@"approval"\]\)\s*\{\s*h\s*=\s*MIN\(kExpandedHeightMax,\s*MAX\(140\.0,\s*h\)\);\s*\}/,
+		'computeTargetContentHeight must allow approval height to scale up to kExpandedHeightMax');
+});
+
+// 15. Session Menu Local Anchor
+test('Session Switcher: showSessionMenu positions popup menu in sessionButton coordinate system', () => {
+	const mm = readFileSync(join(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// showSessionMenu must anchor to sessionButton, not window coordinates double-offset in container
+	assert.match(mm, /\[menu popUpMenuPositioningItem:nil atLocation:NSMakePoint\(0,\s*NSHeight\(self\.sessionButton\.frame\)\s*\+\s*4\)\s+inView:self\.sessionButton\];/,
+		'showSessionMenu must position menu atLocation inView:self.sessionButton');
+});
+
+// 16. Product Naming in main.ts crashReporter
+test('Product Naming: src/main.ts crashReporter uses productName without Dev suffix', () => {
+	const mainTs = readFileSync(join(repoRoot, 'src/main.ts'), 'utf8');
+
+	assert.match(mainTs, /productName:\s*productName,/,
+		'main.ts crashReporter must use productName directly');
+	assert.doesNotMatch(mainTs, /productName:\s*process\.env\['VSCODE_DEV'\]\s*\?\s*`\$\{productName\}\s+Dev`\s*:\s*productName/,
+		'main.ts must not append Dev to productName in dev mode');
 });
 

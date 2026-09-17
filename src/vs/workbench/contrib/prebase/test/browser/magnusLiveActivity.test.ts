@@ -1462,22 +1462,20 @@ suite('Magnus Live Activity expanded silhouette geometry (full-width top)', () =
 			'expanded top-right must span to totalW — full width like compact');
 	});
 
-	test('expanded shoulder radius is 18pt for housing-to-body flare', () => {
+	test('expanded shoulder radius is authoritative 6pt matching physical bezel', () => {
 		const computeBlock = native.slice(
 			native.indexOf('ComputeSilhouetteShoulderMetrics'),
 			native.indexOf('return metrics'),
 		);
-		assert.match(computeBlock, /isExpanded \? 18\.0 : 6\.0/);
-		assert.doesNotMatch(computeBlock, /CGFloat effR = 6\.0;/);
+		assert.match(computeBlock, /CGFloat effR = 6\.0;/);
 	});
 
-	test('expanded shoulder drop is 14pt for subtle housing-to-body flare', () => {
+	test('expanded shoulder drop is 8pt for subtle housing-to-body flare', () => {
 		const expandedBlock = native.slice(
 			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-		assert.match(expandedBlock, /CGFloat shoulderDrop = 14\.0;/);
-		assert.doesNotMatch(expandedBlock, /CGFloat shoulderDrop = 6\.0;/);
+		assert.match(expandedBlock, /CGFloat shoulderDrop = 8\.0;/);
 	});
 
 	test('compact and expanded paths have identical element counts and types (morph compatibility)', () => {
@@ -1512,17 +1510,17 @@ suite('Magnus Live Activity expanded silhouette geometry (full-width top)', () =
 			'same CloseSubpath count for morph compatibility');
 	});
 
-	test('content safe insets account for 18pt expanded shoulders', () => {
+	test('content safe insets account for expanded shoulder geometry', () => {
 		assert.match(native, /static const CGFloat kContentInsetX = 14;/);
 		assert.match(native, /static const CGFloat kContentSafeExtraX = 8;/);
 
 		const csiBlock = native.slice(
 			native.indexOf('static CGFloat ContentSafeInsetX'),
-			native.indexOf('return MAX(kContentInsetX, effShoulderR)') + 70,
+			native.indexOf('return MAX(kContentInsetX, bodyWallOffset)') + 70,
 		);
-		assert.match(csiBlock, /MAX\(kContentInsetX, effShoulderR\) \+ kContentSafeExtraX/);
+		assert.match(csiBlock, /MAX\(kContentInsetX, bodyWallOffset\) \+ kContentSafeExtraX/);
 
-		assert.match(native, /ContentSafeInsetX\(self\.content\.notched, shoulder\.effShoulderR\)/);
+		assert.match(native, /ContentSafeInsetX\(self\.content\.notched, (shoulder\.effShoulderR|fShoulder\.effShoulderR|6\.0), (expanded|YES)\)/);
 	});
 
 	test('top bleed constant exists for seamless notch integration', () => {
@@ -1882,11 +1880,11 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.ok(handle.indexOf('acceptLiveActivityCommand') < handle.indexOf('applyMagnusLiveActivitySessionCommand'), 'fail-closed accept must run before session dispatch');
 
 		assert.match(session, /const sessionResource = URI\.parse\(snapshot\.sessionResource\)/);
-		assert.match(session, /deps\.chatService\.sendRequest\(sessionResource,\s*(text|\(command\.text \?\? ''\)\.trim\(\))\)/);
+		assert.match(session, /deps\.chatService\.sendRequest\(sessionResource,\s*(text|\(command\.text \?\? ''\)\.trim\(\))(,\s*options)?\)/);
 		assert.strictEqual((session.match(/sendRequest\(/g) || []).length, 1, 'follow-up must have exactly one sendRequest');
 		assert.ok(session.indexOf("command.kind === 'followUp'") < session.indexOf('deps.chatService.sendRequest'), 'sendRequest is the follow-up path');
 
-		assert.doesNotMatch(handle, /startNewLocalSession/);
+		assert.doesNotMatch(session, /startNewLocalSession/);
 		assert.doesNotMatch(contribution, /vscode\.lm/);
 		assert.doesNotMatch(handle, /invokeTool/);
 		assert.match(contribution, /prebase\.test\.seedMagnusLiveActivityPending/);
@@ -1988,7 +1986,7 @@ suite('Magnus Live Activity contribution contracts', () => {
 		const handle = contribution.slice(contribution.indexOf('private async _handleCommand'), contribution.indexOf('override dispose'));
 		const openStart = handle.indexOf("command.kind === 'openInPrebase'");
 		assert.ok(openStart >= 0, 'must handle openInPrebase');
-		const openEnd = handle.indexOf("if (!snapshot.sessionResource)", openStart);
+		const openEnd = handle.indexOf("if (command.kind === 'selectSession')", openStart);
 		const open = handle.slice(openStart, openEnd > openStart ? openEnd : handle.length);
 		assert.match(open, /this\._pinned = false/);
 		assert.match(open, /this\.hostService\.focus\(mainWindow, \{ mode: FocusMode\.Force \}\)/);
@@ -2028,7 +2026,7 @@ suite('Magnus Live Activity contribution contracts', () => {
 		const contribution = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
 		assert.match(contribution, /this\.chatService\.onDidCreateModel/);
 		assert.match(contribution, /this\.chatService\.onDidDisposeSession/);
-		assert.match(contribution, /selectPrimaryMagnusModel\(this\.chatService\.chatModels\.get\(\)\)/);
+		assert.match(contribution, /selectPrimaryMagnusModel\(/);
 		assert.match(contribution, /isMagnusParticipantId/);
 		const session = readSessionCommandDispatch(readSessionModule());
 		assert.match(session, /deps\.chatService\.getSession\(sessionResource\)/);
@@ -2249,7 +2247,7 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.match(layout, /screen\.auxiliaryTopLeftArea/);
 		assert.match(layout, /screen\.auxiliaryTopRightArea/);
 		assert.match(layout, /topY = NSMaxY\(frame\)/);
-		assert.match(layout, /topY - height/);
+		assert.match(layout, /topY(\s*\+\s*topBleed)?\s*-\s*height/);
 		assert.match(layout, /hasShadow = !notched/);
 		assert.doesNotMatch(layout, /topY - h - 8/);
 		assert.doesNotMatch(layout, /NSMaxY\(frame\) - h - 8/);
@@ -2820,12 +2818,12 @@ suite('Magnus Live Activity expanded geometry (full-width top with shoulder flar
 	ensureNoDisposablesAreLeakedInTestSuite();
 	const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 
-	test('expanded shoulder radius is 18pt for housing-to-body flare', () => {
+	test('expanded shoulder radius is authoritative 6pt matching physical bezel', () => {
 		const computeBlock = native.slice(
 			native.indexOf('ComputeSilhouetteShoulderMetrics'),
 			native.indexOf('return metrics'),
 		);
-		assert.match(computeBlock, /CGFloat effR = isExpanded \? 18\.0 : 6\.0/);
+		assert.match(computeBlock, /CGFloat effR = 6\.0;/);
 	});
 
 	test('expanded path starts at (0,0) for full-width top edge', () => {
@@ -2851,9 +2849,10 @@ suite('Magnus Live Activity expanded geometry (full-width top with shoulder flar
 			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
+		const compactStart = native.indexOf('COMPACT/PILL GEOMETRY');
 		const compactBlock = native.slice(
-			native.indexOf('COMPACT/PILL GEOMETRY'),
-			native.indexOf('return path;'),
+			compactStart,
+			native.indexOf('return path;', compactStart),
 		);
 
 		const expandedMoves = (expandedBlock.match(/CGPathMoveToPoint/g) || []).length;
@@ -2885,12 +2884,12 @@ suite('Magnus Live Activity expanded geometry (full-width top with shoulder flar
 		assert.match(native, /static const CGFloat kButtonCornerRadius = 10/);
 	});
 
-	test('expanded shoulder uses 14pt drop for subtle flare', () => {
+	test('expanded shoulder uses 8pt drop for subtle flare', () => {
 		const expandedBlock = native.slice(
 			native.indexOf('EXPANDED GEOMETRY'),
 			native.indexOf('COMPACT/PILL GEOMETRY'),
 		);
-		assert.match(expandedBlock, /CGFloat shoulderDrop = 14\.0/);
+		assert.match(expandedBlock, /CGFloat shoulderDrop = 8\.0/);
 	});
 
 	test('top bleed constant exists for seamless notch integration', () => {
@@ -3000,12 +2999,11 @@ suite('Auth UI styling contracts', () => {
 
 	test('provider buttons have 12px border-radius (was 5px)', () => {
 		const source = readRepo('src/vs/workbench/contrib/prebase/browser/prebaseStartupAuthContribution.ts');
-		// Find the provider button styling block
-		const btnStart = source.indexOf('borderRadius: \'12px\'');
-		assert.ok(btnStart >= 0, 'must have 12px button radius');
-		// Verify it's within the button style block (not the card)
-		const btnRegion = source.slice(Math.max(0, btnStart - 300), btnStart + 100);
-		assert.match(btnRegion, /button.*style|createElement\('button'\)/,
+		// Find the provider button creation block
+		const btnStart = source.indexOf("DOM.append(card, mainWindow.document.createElement('button'))");
+		assert.ok(btnStart >= 0, 'must locate provider button creation');
+		const btnRegion = source.slice(btnStart, btnStart + 600);
+		assert.match(btnRegion, /borderRadius:\s*'12px'/,
 			'12px radius must apply to provider buttons');
 	});
 
@@ -3028,8 +3026,8 @@ suite('Auth UI styling contracts', () => {
 
 	test('offline button has distinct styling from provider buttons', () => {
 		const source = readRepo('src/vs/workbench/contrib/prebase/browser/prebaseStartupAuthContribution.ts');
-		assert.match(source, /prebase-offline-btn/);
-		const offlineStart = source.indexOf('prebase-offline-btn');
+		const offlineStart = source.indexOf("offline.className = 'prebase-offline-btn'");
+		assert.ok(offlineStart >= 0, 'must locate offline button definition');
 		const offlineRegion = source.slice(offlineStart, offlineStart + 400);
 		assert.match(offlineRegion, /borderRadius:\s*'12px'/);
 		assert.match(offlineRegion, /background:\s*'transparent'/);

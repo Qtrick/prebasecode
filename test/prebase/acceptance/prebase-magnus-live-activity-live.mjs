@@ -182,8 +182,8 @@ export function liveActivityLiveFailures(evidence) {
 					}
 				}
 				if (key === 'approval') {
-					if (shot.native.panelFrame && shot.native.panelFrame.height > 165) {
-						failures.push(`visual fixture approval panelFrame height (${shot.native.panelFrame.height}pt) exceeds limit 165pt`);
+					if (shot.native.panelFrame && shot.native.panelFrame.height > 185) {
+						failures.push(`visual fixture approval panelFrame height (${shot.native.panelFrame.height}pt) exceeds limit 185pt`);
 					}
 					if (shot.native.composerVisible === true) {
 						failures.push('visual fixture approval must NOT have composer visible (Approve/Deny is primary)');

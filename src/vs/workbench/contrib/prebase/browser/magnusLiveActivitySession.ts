@@ -163,7 +163,7 @@ export async function applyMagnusLiveActivitySessionCommand(
 			deps.logService.info('[MagnusLiveActivity] followUp ignored: empty text');
 			return;
 		}
-		const requests = model?.getRequests() ?? [];
+		const requests = typeof model?.getRequests === 'function' ? model.getRequests() : [];
 		const isInitialRequest = requests.length === 0;
 		const options = isInitialRequest ? { agentId: 'prebase.magnus.agent' } : undefined;
 		await deps.chatService.sendRequest(sessionResource, text, options);

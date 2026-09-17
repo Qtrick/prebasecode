@@ -2328,6 +2328,14 @@ test('liveActivityLiveFailures validates factual native diagnostics and handles 
 			stickyPeekRefused: true,
 			afterEscapePresentation: 'attentionCompact',
 		},
+		visualFixtures: {
+			workingInteractive: { screenshot: { captured: true }, contextScreenshot: { captured: true } },
+			question: { screenshot: { captured: true }, contextScreenshot: { captured: true } },
+			approval: { screenshot: { captured: true }, contextScreenshot: { captured: true } },
+			long: { screenshot: { captured: true }, contextScreenshot: { captured: true } },
+			attentionPeek: { screenshot: { captured: true }, contextScreenshot: { captured: true } },
+			completed: { screenshot: { captured: true }, contextScreenshot: { captured: true } },
+		},
 	};
 	assert.deepEqual(liveActivityLiveFailures(validDarwin), []);
 
